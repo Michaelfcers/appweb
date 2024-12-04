@@ -1,4 +1,3 @@
-// lib/views/messages/messages_screen.dart
 import 'package:flutter/material.dart';
 import '../Layout/layout.dart';
 import 'chat_screen.dart';
@@ -22,10 +21,7 @@ class MessagesScreen extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
+          // Eliminamos el botón `leading`
         ),
         body: ListView(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -47,10 +43,7 @@ class MessagesScreen extends StatelessWidget {
           ],
         ),
       ),
-      currentIndex: 0,
-      onTabSelected: (index) {
-        // Aquí se puede definir el cambio de pantalla si se necesita
-      },
+      currentIndex: 0, // Nos aseguramos de que el índice sea correcto para Home
     );
   }
 }

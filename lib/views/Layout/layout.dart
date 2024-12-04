@@ -34,11 +34,8 @@ class LayoutState extends State<Layout> {
     _currentIndex = widget.currentIndex;
   }
 
-  void _onTabTapped(int index) {
-    setState(() {
-      _currentIndex = index;
-    });
-
+void _onTabTapped(int index) {
+  if (_currentIndex != index) {
     // Decidimos dinámicamente la pantalla a mostrar
     Widget nextScreen;
     switch (index) {
@@ -49,24 +46,26 @@ class LayoutState extends State<Layout> {
         nextScreen = const SearchScreen();
         break;
       case 2:
-        // Accedemos a AuthNotifier para decidir entre las pantallas de perfil
         final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
         nextScreen = authNotifier.isLoggedIn
-            ? const ProfileScreen() // Usuario logueado
-            : const ProfileLoggedOutScreen(); // Usuario no logueado
+            ? const ProfileScreen()
+            : const ProfileLoggedOutScreen();
         break;
       default:
         nextScreen = const HomeScreen();
         break;
     }
 
-    // Navegación con reemplazo para mantener el contexto de Provider
-    Navigator.of(context).pushReplacement(
+    // Evitar apilar múltiples instancias de Layout
+    Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (context) => Layout(body: nextScreen, currentIndex: index),
       ),
+      (route) => false, // Elimina todas las rutas anteriores
     );
   }
+}
+
 
   @override
   Widget build(BuildContext context) {

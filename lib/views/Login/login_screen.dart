@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../styles/colors.dart';
+import '../../auth_notifier.dart';
 import 'signup_screen.dart';
 import 'recovery_password_screen.dart';
 
@@ -17,7 +19,7 @@ class LoginScreen extends StatelessWidget {
         backgroundColor: AppColors.primary,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary), // Flecha dinámica
+          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () {
             Navigator.pop(context);
           },
@@ -51,7 +53,7 @@ class LoginScreen extends StatelessWidget {
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
                 prefixIcon: Icon(Icons.person, color: AppColors.iconSelected),
-                labelText: "Usuario",
+                labelText: "Correo", // Cambiado para reflejar el campo de correo
                 labelStyle: TextStyle(color: AppColors.textSecondary, fontSize: 18),
                 filled: true,
                 fillColor: AppColors.cardBackground,
@@ -104,19 +106,50 @@ class LoginScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.iconSelected,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 100),
-              ),
-              onPressed: () {},
-              child: Text(
-                "INGRESAR",
-                style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold),
-              ),
+            Consumer<AuthNotifier>(
+              builder: (context, authNotifier, child) {
+                return ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.iconSelected,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 100),
+                  ),
+                  onPressed: () async {
+                    final email = emailController.text.trim();
+                    final password = passwordController.text.trim();
+
+                    // Validar que los campos no estén vacíos
+                    if (email.isEmpty || password.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Por favor, completa todos los campos.')),
+                      );
+                      return;
+                    }
+
+                    // Intentar iniciar sesión
+                    try {
+                      await authNotifier.logIn(email, password);
+                      Navigator.pushReplacementNamed(context, '/home'); // Navegar al home
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: ${e.toString()}')),
+                      );
+                    }
+                  },
+                  child: authNotifier.isLoggedIn
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          "INGRESAR",
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                );
+              },
             ),
             const SizedBox(height: 30),
             TextButton(
@@ -134,47 +167,6 @@ class LoginScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: Divider(
-                    color: AppColors.divider,
-                    thickness: 1,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(
-                    "O ingresá con",
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
-                  ),
-                ),
-                Expanded(
-                  child: Divider(
-                    color: AppColors.divider,
-                    thickness: 1,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.iconSelected,
-                side: BorderSide(color: AppColors.iconSelected, width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 60),
-              ),
-              icon: Icon(Icons.login_rounded, color: AppColors.iconSelected, size: 24),
-              label: Text(
-                "INGRESAR CON GOOGLE",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              onPressed: () {},
             ),
           ],
         ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Paleta de colores base
+  // Colores existentes
   static const Color black = Colors.black;
   static const Color white = Colors.white;
   static const Color grey = Colors.black54;
@@ -17,7 +17,7 @@ class AppColors {
     _isDarkMode = isDarkMode;
   }
 
-  // Getters para colores específicos del tema
+  // Colores dinámicos
   static Color get primary => _isDarkMode ? black : redDark;
   static Color get secondary => grey;
   static Color get tittle => _isDarkMode ? beigeLight : beigeLight;
@@ -29,6 +29,10 @@ class AppColors {
   static Color get divider => _isDarkMode ? lightGrey : Colors.black38;
   static Color get iconSelected => selectedIcon;
   static Color get iconUnselected => _isDarkMode ? white : grey;
+
+  // Colores específicos para los diálogos
+  static Color get dialogBackground => _isDarkMode ? grey.withOpacity(0.9) : white;
+  static Color get dialogText => _isDarkMode ? white : black;
 
   // Crear ThemeData dinámicamente
   static ThemeData getThemeData(bool isDarkMode) {
@@ -48,3 +52,4 @@ class AppColors {
     );
   }
 }
+

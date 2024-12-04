@@ -5,7 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../models/book_model.dart';
 import '../../services/google_books_service.dart';
-import '../Login/login_screen.dart';
+import '../Notifications/notifications_screen.dart';
+import '../Messages/messages_screen.dart';
 import '../Books/book_details_screen.dart';
 import '../../styles/colors.dart';
 import '../../auth_notifier.dart'; // Para manejar la sesión del usuario
@@ -56,7 +57,85 @@ class _HomeScreenLoggedOutState extends State<HomeScreenLoggedOut> {
     }
   }
 
-  void _showLoginPrompt() {
+  @override
+  Widget build(BuildContext context) {
+    return Layout(
+      body: Scaffold(
+        backgroundColor: AppColors.scaffoldBackground,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: AppColors.primary,
+          title: Text(
+            "BookSwap",
+            style: GoogleFonts.poppins(
+              color: AppColors.tittle,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.message, color: AppColors.textPrimary),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MessagesScreen(),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              icon: Icon(Icons.notifications, color: AppColors.textPrimary),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const NotificationsScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        body: Container(
+          color: AppColors.scaffoldBackground,
+          child: isLoading
+              ? _buildSkeletonLoader()
+              : RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: fetchBooks,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16.0),
+                    children: [
+                      _buildSectionTitle("Libros Destacados"),
+                      const SizedBox(height: 10),
+                      _buildCarousel(featuredBooks),
+                      const SizedBox(height: 20),
+                      _buildSectionTitle("Recomendados para Ti"),
+                      const SizedBox(height: 10),
+                      _buildCarousel(recommendedBooks),
+                      const SizedBox(height: 20),
+                      _buildSectionTitle("Libros Populares"),
+                      const SizedBox(height: 10),
+                      _buildCarousel(popularBooks),
+                    ],
+                  ),
+                ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: AppColors.primary,
+          onPressed: () {
+            _showLoginPrompt(context);
+          },
+          child: Icon(Icons.add, color: AppColors.textPrimary),
+        ),
+      ),
+      currentIndex: 0, // Se asegura de mostrar la pestaña de Home
+    );
+  }
+
+  void _showLoginPrompt(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) {
@@ -104,12 +183,7 @@ class _HomeScreenLoggedOutState extends State<HomeScreenLoggedOut> {
                     ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
+                        Navigator.pushNamed(context, '/login');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.iconSelected,
@@ -136,78 +210,6 @@ class _HomeScreenLoggedOutState extends State<HomeScreenLoggedOut> {
           ),
         );
       },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final authNotifier = Provider.of<AuthNotifier>(context);
-
-    return Layout(
-      body: Scaffold(
-        backgroundColor: AppColors.scaffoldBackground,
-        appBar: AppBar(
-          elevation: 0,
-          backgroundColor: AppColors.primary,
-          title: Text(
-            "BookSwap",
-            style: GoogleFonts.poppins(
-              color: AppColors.tittle,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.message, color: AppColors.textPrimary),
-              onPressed: authNotifier.isLoggedIn
-                  ? () {
-                      // Acción para mensajes si está logueado
-                    }
-                  : _showLoginPrompt,
-            ),
-            IconButton(
-              icon: Icon(Icons.notifications, color: AppColors.textPrimary),
-              onPressed: authNotifier.isLoggedIn
-                  ? () {
-                      // Acción para notificaciones si está logueado
-                    }
-                  : _showLoginPrompt,
-            ),
-          ],
-        ),
-        body: Container(
-          color: AppColors.scaffoldBackground,
-          child: isLoading
-              ? _buildSkeletonLoader()
-              : RefreshIndicator(
-                  color: AppColors.primary,
-                  onRefresh: fetchBooks,
-                  child: ListView(
-                    padding: const EdgeInsets.all(16.0),
-                    children: [
-                      _buildSectionTitle("Libros Destacados"),
-                      const SizedBox(height: 10),
-                      _buildCarousel(featuredBooks),
-                      const SizedBox(height: 20),
-                      _buildSectionTitle("Recomendados para Ti"),
-                      const SizedBox(height: 10),
-                      _buildCarousel(recommendedBooks),
-                      const SizedBox(height: 20),
-                      _buildSectionTitle("Libros Populares"),
-                      const SizedBox(height: 10),
-                      _buildCarousel(popularBooks),
-                    ],
-                  ),
-                ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          backgroundColor: AppColors.primary,
-          onPressed: _showLoginPrompt,
-          child: Icon(Icons.add, color: AppColors.textPrimary),
-        ),
-      ),
-      currentIndex: 0, // Se asegura de mostrar la pestaña de Home
     );
   }
 

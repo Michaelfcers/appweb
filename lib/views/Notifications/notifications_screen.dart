@@ -1,4 +1,3 @@
-// lib/views/notifications/notifications_screen.dart
 import 'package:flutter/material.dart';
 import '../../styles/colors.dart';
 import '../Layout/layout.dart';
@@ -17,10 +16,7 @@ class NotificationsScreen extends StatelessWidget {
             "Notificaciones",
             style: TextStyle(color: AppColors.textPrimary),
           ),
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
+          // Eliminamos el botón `leading`
         ),
         body: ListView(
           padding: const EdgeInsets.all(10),
@@ -43,12 +39,11 @@ class NotificationsScreen extends StatelessWidget {
           ],
         ),
       ),
-      currentIndex: 0,
+      currentIndex: 0, // Nos aseguramos de que el índice sea correcto para Home
     );
   }
 }
 
-// Widget de tarjeta de notificación reutilizable
 class NotificationCard extends StatelessWidget {
   final IconData icon;
   final String title;
