@@ -11,7 +11,6 @@ import 'views/Profile/profile_logged_out_screen.dart';
 import 'views/Layout/layout.dart';
 import 'views/Home/start_page.dart';
 import 'views/Home/home_screen_logged_out.dart';
-import 'views/Login/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,24 +39,63 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeNotifier = Provider.of<ThemeNotifier>(context);
-    final authNotifier = Provider.of<AuthNotifier>(context);
 
     return MaterialApp(
       title: 'BookSwap',
       debugShowCheckedModeBanner: false,
-      theme: AppColors.getThemeData(false),
-      darkTheme: AppColors.getThemeData(true),
+      theme: AppColors.getThemeData(false), // Tema claro
+      darkTheme: AppColors.getThemeData(true), // Tema oscuro
       themeMode: themeNotifier.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: const StartPage(), // Usamos StartPage como pantalla inicial
+      initialRoute: '/start', // Ruta inicial
       routes: {
-        '/start': (context) => const StartPage(),
-        '/home': (context) => const HomeScreen(),
-        '/homeLoggedOut': (context) => const HomeScreenLoggedOut(),
-        '/search': (context) => const SearchScreen(),
-        '/profile': (context) => authNotifier.isLoggedIn
-            ? const ProfileScreen()
-            : const ProfileLoggedOutScreen(),
-        '/login': (context) => const LoginScreen(),
+        '/start': (context) => const StartPage(), // Pantalla inicial
+         '/home': (context) => const HomeScreen(),
+        '/homeLoggedOut': (context) => const HomeScreenLoggedOut(), // Clase HomeScreenLoggedOut
+        '/search': (context) => const LayoutWrapper(index: 1), // Pantalla Buscar
+        '/profile': (context) => const LayoutWrapper(index: 2), // Pantalla Perfil
+      },
+    );
+  }
+}
+
+// Wrapper para manejar las diferentes pantallas dentro del Layout
+class LayoutWrapper extends StatelessWidget {
+  final int index;
+  const LayoutWrapper({super.key, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final authNotifier = Provider.of<AuthNotifier>(context);
+
+    final List<Widget> screens = [
+      const HomeScreen(),
+      const SearchScreen(),
+      authNotifier.isLoggedIn
+          ? const ProfileScreen() // Perfil cuando está logueado
+          : const ProfileLoggedOutScreen(), // Perfil cuando no está logueado
+    ];
+
+    return Layout(
+      body: screens[index],
+      currentIndex: index,
+      onTabSelected: (selectedIndex) {
+        // Navegación dinámica según la tab seleccionada
+        String route;
+        switch (selectedIndex) {
+          case 0:
+            route = '/home';
+            break;
+          case 1:
+            route = '/search';
+            break;
+          case 2:
+          default:
+            route = '/profile';
+            break;
+        }
+        if (selectedIndex != index) {
+          Navigator.pushReplacementNamed(context, route);
+        }
       },
     );
   }
