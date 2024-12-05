@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:bookswapv5/models/book_model.dart';
+import '../models/book_model.dart';
 
 class GoogleBooksService {
   Future<String> _loadApiKey() async {
@@ -11,7 +11,7 @@ class GoogleBooksService {
   }
 
   Future<List<Book>> fetchBooks(String query) async {
-    final apiKey = await _loadApiKey(); // Carga la API key desde el archivo JSON
+    final apiKey = await _loadApiKey();
     final url = Uri.parse(
         'https://www.googleapis.com/books/v1/volumes?q=$query&key=$apiKey');
 
@@ -25,4 +25,27 @@ class GoogleBooksService {
       throw Exception('Error al cargar los libros');
     }
   }
+
+  // Método para obtener los detalles de un libro específico
+  Future<Book> fetchBookDetails(String title) async {
+    final apiKey = await _loadApiKey();
+    final url = Uri.parse(
+        'https://www.googleapis.com/books/v1/volumes?q=intitle:$title&key=$apiKey');
+
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+
+      if (data['items'] == null || data['items'].isEmpty) {
+        throw Exception('No se encontró ningún libro con ese título');
+      }
+
+      // Retorna el primer resultado encontrado
+      return Book.fromJson(data['items'][0]);
+    } else {
+      throw Exception('Error al buscar el libro');
+    }
+  }
 }
+  

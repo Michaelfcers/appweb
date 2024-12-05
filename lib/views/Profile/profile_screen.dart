@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../models/book_model.dart';
 import '../../../services/google_books_service.dart';
+import '../../../services/user_service.dart'; // Importa UserService
 import '../Settings/settings_screen.dart';
 import '../Books/add_book_dialog.dart';
 import '../Books/book_detail_edit_screen.dart';
@@ -19,16 +20,35 @@ class ProfileScreen extends StatefulWidget {
 
 class ProfileScreenState extends State<ProfileScreen> {
   final GoogleBooksService booksService = GoogleBooksService();
+  final UserService userService = UserService(); // Instancia de UserService
   List<Book> uploadedBooks = [];
   bool isLoading = true;
+
+  String nickname = "Usuario"; // Nickname inicial
+  int experience = 0; // Experiencia inicial
   int _selectedTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    fetchUploadedBooks();
+    fetchUserData(); // Obtiene los datos del usuario
+    fetchUploadedBooks(); // Obtiene los libros subidos
   }
 
+  // Método para obtener los datos del usuario desde Supabase
+  Future<void> fetchUserData() async {
+    try {
+      final userProfile = await userService.getUserProfile();
+      setState(() {
+        nickname = userProfile['nickname'] ?? "Usuario";
+        experience = userProfile['experience'] ?? 0;
+      });
+    } catch (error) {
+      debugPrint('Error al obtener el perfil del usuario: $error');
+    }
+  }
+
+  // Método para obtener los libros subidos
   Future<void> fetchUploadedBooks() async {
     try {
       final books = await booksService.fetchBooks("technology");
@@ -44,35 +64,31 @@ class ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final themeNotifier = Provider.of<ThemeNotifier>(context);
-    final authNotifier = Provider.of<AuthNotifier>(context); // Accedemos al AuthNotifier
+    final authNotifier = Provider.of<AuthNotifier>(context);
 
-
-    // Si el usuario no está logueado, redirigimos al ProfileLoggedOutScreen
     if (!authNotifier.isLoggedIn) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacementNamed(context, '/profile'); // Redirige al perfil sin sesión
+        Navigator.pushReplacementNamed(context, '/profile');
       });
-      return Container(); // Devuelve un contenedor vacío mientras se realiza la redirección
+      return Container();
     }
 
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBackground, // Dinámico
+      backgroundColor: AppColors.scaffoldBackground,
       appBar: AppBar(
-        backgroundColor: AppColors.primary, // Dinámico
+        backgroundColor: AppColors.primary,
         title: Text(
           "Perfil",
-          style: TextStyle(color: AppColors.textPrimary), // Dinámico
+          style: TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.settings, color: AppColors.textPrimary), // Dinámico
+            icon: Icon(Icons.settings, color: AppColors.textPrimary),
             onPressed: () async {
-              // Abrimos la pantalla de configuración y esperamos su resultado
               await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const SettingsScreen()),
               );
-              // Actualizamos el estado tras regresar
               setState(() {
                 AppColors.toggleTheme(themeNotifier.isDarkMode);
               });
@@ -89,42 +105,45 @@ class ProfileScreenState extends State<ProfileScreen> {
               children: [
                 CircleAvatar(
                   radius: 40,
-                  backgroundColor: AppColors.shadow, // Dinámico
+                  backgroundColor: AppColors.shadow,
                   child: Icon(Icons.person,
-                      size: 40, color: AppColors.textPrimary), // Dinámico
+                      size: 40, color: AppColors.textPrimary),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Muestra dinámicamente el nickname
                       Text(
-                        'Usuario123',
+                        nickname,
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary, // Dinámico
+                          color: AppColors.textPrimary,
                         ),
                       ),
+                      // Calcula y muestra el nivel dinámico
                       Text(
-                        'Nivel 5 - Lector Ávido',
-                        style: TextStyle(color: AppColors.textPrimary), // Dinámico
+                        'Nivel ${experience ~/ 1000} - Lector Ávido',
+                        style: TextStyle(color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 10),
+                      // Calcula y muestra el progreso de XP
                       LinearProgressIndicator(
-                        value: 0.75,
-                        color: AppColors.iconSelected, // Dinámico
-                        backgroundColor: AppColors.shadow, // Dinámico
+                        value: (experience % 1000) / 1000,
+                        color: AppColors.iconSelected,
+                        backgroundColor: AppColors.shadow,
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        '750/1000 XP',
-                        style: TextStyle(color: AppColors.textPrimary), // Dinámico
+                        '${experience % 1000}/1000 XP',
+                        style: TextStyle(color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 10),
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: AppColors.iconSelected), // Dinámico
+                          side: BorderSide(color: AppColors.iconSelected),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18),
                           ),
@@ -139,8 +158,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                         },
                         child: Text(
                           "Editar perfil",
-                          style:
-                              TextStyle(color: AppColors.iconSelected), // Dinámico
+                          style: TextStyle(color: AppColors.iconSelected),
                         ),
                       ),
                     ],
@@ -192,7 +210,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                 );
               },
               child: Card(
-                color: AppColors.cardBackground, // Dinámico
+                color: AppColors.cardBackground,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -202,14 +220,14 @@ class ProfileScreenState extends State<ProfileScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.add,
-                          color: AppColors.iconSelected, size: 36), // Dinámico
+                          color: AppColors.iconSelected, size: 36),
                       const SizedBox(height: 8),
                       Text(
                         'Agregar libro',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.iconSelected, // Dinámico
+                          color: AppColors.iconSelected,
                         ),
                       ),
                     ],
@@ -229,7 +247,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                 );
               },
               child: Card(
-                color: AppColors.cardBackground, // Dinámico
+                color: AppColors.cardBackground,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -257,7 +275,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.primary, // Dinámico
+                          color: AppColors.primary,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -269,7 +287,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                         book.author,
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary, // Dinámico
+                          color: AppColors.textSecondary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -307,18 +325,18 @@ class ProfileScreenState extends State<ProfileScreen> {
       itemBuilder: (context, index) {
         final achievement = achievements[index];
         return Card(
-          color: AppColors.cardBackground, // Dinámico
+          color: AppColors.cardBackground,
           margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 16),
           child: ListTile(
             leading: Icon(Icons.emoji_events,
-                color: AppColors.iconSelected), // Dinámico
+                color: AppColors.iconSelected),
             title: Text(
               achievement["title"]!,
-              style: TextStyle(color: AppColors.textSecondary), // Dinámico
+              style: TextStyle(color: AppColors.textSecondary),
             ),
             subtitle: Text(
               achievement["description"]!,
-              style: TextStyle(color: AppColors.textSecondary), // Dinámico
+              style: TextStyle(color: AppColors.textSecondary),
             ),
           ),
         );
@@ -341,7 +359,7 @@ class ProfileScreenState extends State<ProfileScreen> {
               bottom: BorderSide(
                 color: _selectedTabIndex == index
                     ? AppColors.iconSelected
-                    : Colors.transparent, // Dinámico
+                    : Colors.transparent,
                 width: 2,
               ),
             ),
@@ -351,7 +369,7 @@ class ProfileScreenState extends State<ProfileScreen> {
               icon,
               color: _selectedTabIndex == index
                   ? AppColors.iconSelected
-                  : AppColors.textPrimary, // Dinámico
+                  : AppColors.textPrimary,
               size: 28,
             ),
           ),

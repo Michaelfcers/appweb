@@ -12,10 +12,18 @@ class AuthNotifier extends ChangeNotifier {
   }
 
   Future<void> _checkInitialSession() async {
-    // Comprobar si ya hay una sesión activa al iniciar la app
     final session = _supabase.auth.currentSession;
     _isLoggedIn = session != null;
     notifyListeners();
+  }
+
+  String? get userId {
+    final user = _supabase.auth.currentUser;
+    return user?.id;
+  }
+
+  User? get currentUser {
+    return _supabase.auth.currentUser; // Getter para obtener el usuario actual
   }
 
   Future<void> logIn(String email, String password) async {
@@ -25,7 +33,6 @@ class AuthNotifier extends ChangeNotifier {
         password: password,
       );
 
-      // Si el usuario se autentica correctamente
       if (response.session != null) {
         _isLoggedIn = true;
         notifyListeners();
