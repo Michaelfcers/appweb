@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserService {
@@ -25,11 +26,13 @@ class UserService {
   }
 
   // Agregar un libro asociado al usuario logueado
- Future<void> addBookToUser({
+Future<void> addBookToUser({
   required String title,
   required String author,
   String? genre,
   String? description,
+  required String condition,
+  required List<String> photos,
   required String thumbnail,
 }) async {
   final userId = _supabase.auth.currentUser?.id;
@@ -38,22 +41,44 @@ class UserService {
     throw Exception('Usuario no autenticado');
   }
 
-final response = await _supabase.from('books').insert({
-  'user_id': userId,
-  'title': title,
-  'author': author,
-  'genre': genre,
-  'synopsis': description,
-  'rating': 0, // Si rating puede ser opcional
-  'cover_url': thumbnail,
-  'condition': 'Nuevo', // Agregar un valor predeterminado
-  'created_at': DateTime.now().toIso8601String(),
-});
+  // Serializar las fotos como JSON
+  final photosJson = jsonEncode(photos);
 
+  // Log de los datos que se están enviando
+  final bookData = {
+    'user_id': userId,
+    'title': title,
+    'author': author,
+    'genre': genre,
+    'synopsis': description,
+    'rating': 0,
+    'cover_url': thumbnail,
+    'condition': condition,
+    'photos': photosJson,
+    'created_at': DateTime.now().toIso8601String(),
+    'updated_at': DateTime.now().toIso8601String(),
+  };
 
-  // Verificar si hubo un error basado en el status y los datos
-  if (response.status != 201 && response.status != 200) {
-    throw Exception('Error al agregar libro: ${response.data ?? "Error desconocido"}');
+  print("Datos enviados a Supabase:");
+  print(bookData);
+
+  try {
+    // Realiza la inserción y selecciona los datos insertados
+    final response = await _supabase.from('books').insert(bookData).select();
+
+    // Verificar si la respuesta es válida y no está vacía
+    if (response is List && response.isNotEmpty) {
+      print("Libro agregado exitosamente a Supabase. Respuesta:");
+      print(response);
+    } else {
+      print("Error: Respuesta inesperada de Supabase. Respuesta:");
+      print(response);
+      throw Exception("Error al agregar libro: Respuesta inesperada de Supabase.");
+    }
+  } catch (e) {
+    print("Error al agregar libro: $e");
+    throw Exception("Error al agregar libro: $e");
   }
 }
+
 }
