@@ -1,12 +1,15 @@
-// lib/models/book_model.dart
+import 'dart:convert';
 
 class Book {
   final String title;
   final String author;
   final String thumbnail;
-  final String? genre;        // Nuevo campo opcional para género
-  final double? rating;       // Nuevo campo opcional para calificación
-  final String? description;  // Nuevo campo opcional para sinopsis
+  final String? genre;
+  final double? rating;
+  final String? description;
+  final String? condition;
+  final String? userId;
+  final List<String>? photos;
 
   Book({
     required this.title,
@@ -15,10 +18,13 @@ class Book {
     this.genre,
     this.rating,
     this.description,
+    this.condition,
+    this.userId,
+    this.photos,
   });
 
-  // Método para crear una instancia de Book desde JSON
-  factory Book.fromJson(Map<String, dynamic> json) {
+  // Método para crear una instancia de Book desde JSON de Google Books API
+  factory Book.fromGoogleJson(Map<String, dynamic> json) {
     final volumeInfo = json['volumeInfo'];
     return Book(
       title: volumeInfo['title'] ?? 'Título desconocido',
@@ -27,14 +33,31 @@ class Book {
           : 'Autor desconocido',
       thumbnail: volumeInfo['imageLinks'] != null
           ? volumeInfo['imageLinks']['thumbnail']
-          : 'https://via.placeholder.com/150', // Imagen de placeholder si no hay miniatura
+          : 'https://via.placeholder.com/150',
       genre: (volumeInfo['categories'] != null && volumeInfo['categories'].isNotEmpty)
           ? volumeInfo['categories'][0]
           : 'Sin género especificado',
       rating: volumeInfo['averageRating'] != null
           ? (volumeInfo['averageRating'] as num).toDouble()
-          : null, // Convierte calificación a double
-      description: volumeInfo['description'], // Sinopsis
+          : null,
+      description: volumeInfo['description'],
+    );
+  }
+
+  // Método para crear una instancia de Book desde JSON de Supabase
+  factory Book.fromSupabaseJson(Map<String, dynamic> json) {
+    return Book(
+      title: json['title'] ?? 'Título desconocido',
+      author: json['author'] ?? 'Autor desconocido',
+      thumbnail: json['cover_url'] ?? 'https://via.placeholder.com/150',
+      genre: json['genre'] ?? 'Sin género especificado',
+      rating: json['rating'] != null ? (json['rating'] as num).toDouble() : null,
+      description: json['synopsis'],
+      condition: json['condition'],
+      userId: json['user_id'],
+      photos: (json['photos'] != null)
+          ? List<String>.from(jsonDecode(json['photos']))
+          : null,
     );
   }
 }

@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../models/book_model.dart';
-import '../../../services/google_books_service.dart';
-import '../../../services/user_service.dart'; // Importa UserService
+import '../../../services/user_service.dart';
 import '../Settings/settings_screen.dart';
 import '../Books/add_book_dialog.dart';
 import '../Books/book_detail_edit_screen.dart';
-import '../../styles/colors.dart'; // Importamos AppColors
-import 'edit_profile_screen.dart'; // Importamos la nueva pantalla de edición de perfil
-import '../../styles/theme_notifier.dart'; // Importamos el ThemeNotifier
-import '../../auth_notifier.dart'; // Importamos el AuthNotifier
+import '../../styles/colors.dart';
+import 'edit_profile_screen.dart';
+import '../../styles/theme_notifier.dart';
+import '../../auth_notifier.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,7 +18,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class ProfileScreenState extends State<ProfileScreen> {
-  final GoogleBooksService booksService = GoogleBooksService();
   final UserService userService = UserService(); // Instancia de UserService
   List<Book> uploadedBooks = [];
   bool isLoading = true;
@@ -48,16 +46,20 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // Método para obtener los libros subidos
+  // Método para obtener los libros subidos por el usuario
   Future<void> fetchUploadedBooks() async {
     try {
-      final books = await booksService.fetchBooks("technology");
+      // Llama al servicio para obtener libros subidos por el usuario
+      final books = await userService.getUploadedBooks();
       setState(() {
-        uploadedBooks = books.take(4).toList();
+        uploadedBooks = books; // Asignamos los libros obtenidos
         isLoading = false;
       });
     } catch (error) {
-      debugPrint('Error al cargar los libros: $error');
+      debugPrint('Error al cargar los libros subidos: $error');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -114,7 +116,6 @@ class ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Muestra dinámicamente el nickname
                       Text(
                         nickname,
                         style: TextStyle(
@@ -123,13 +124,11 @@ class ProfileScreenState extends State<ProfileScreen> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      // Calcula y muestra el nivel dinámico
                       Text(
                         'Nivel ${experience ~/ 1000} - Lector Ávido',
                         style: TextStyle(color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 10),
-                      // Calcula y muestra el progreso de XP
                       LinearProgressIndicator(
                         value: (experience % 1000) / 1000,
                         color: AppColors.iconSelected,
