@@ -1,22 +1,26 @@
-// lib/views/Books/book_details_screen.dart
 import 'package:flutter/material.dart';
 import '../../models/book_model.dart';
 import '../../styles/colors.dart';
-import 'book_edit_screen.dart';
-import '../Profile/profile_screen.dart';
-import '../Layout/layout.dart';
+import '../../services/user_service.dart';
 
 class BookDetailsScreen extends StatefulWidget {
   final Book book;
+  final Function(String) onDelete; // Callback para notificar la eliminación del libro
 
-  const BookDetailsScreen({super.key, required this.book});
+  const BookDetailsScreen({
+    super.key,
+    required this.book,
+    required this.onDelete,
+  });
 
   @override
   BookDetailsScreenState createState() => BookDetailsScreenState();
 }
 
 class BookDetailsScreenState extends State<BookDetailsScreen> {
+  final UserService _userService = UserService();
   bool isExpanded = false;
+  bool _isDeleting = false;
 
   void _showDeleteConfirmationDialog(BuildContext context) {
     showDialog(
@@ -42,31 +46,11 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.iconSelected,
+                backgroundColor: Colors.redAccent,
               ),
               onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (context) => const Layout(
-                      body: ProfileScreen(),
-                      currentIndex: 2,
-                    ),
-                  ),
-                  (Route<dynamic> route) => false,
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text("Libro eliminado"),
-                    action: SnackBarAction(
-                      label: "Deshacer",
-                      onPressed: () {
-                        // Lógica para simular la restauración del libro
-                      },
-                      textColor: AppColors.iconSelected,
-                    ),
-                  ),
-                );
+                Navigator.of(context).pop(); // Cierra el diálogo
+                _deleteBook(); // Llama a la función de eliminar
               },
               child: Text(
                 "Eliminar",
@@ -77,6 +61,52 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
         );
       },
     );
+  }
+
+  Future<void> _deleteBook() async {
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      await _userService.deleteBook(widget.book.id);
+
+      if (!mounted) return;
+
+      // Notificar al perfil que se eliminó el libro
+      widget.onDelete(widget.book.id);
+
+      // Mostrar el SnackBar de éxito
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Libro eliminado con éxito.",
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          backgroundColor: AppColors.cardBackground,
+        ),
+      );
+
+      // Regresar a la pantalla anterior
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+
+      // Mostrar el SnackBar con el error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Error al eliminar el libro: $e",
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isDeleting = false;
+      });
+    }
   }
 
   @override
@@ -222,12 +252,7 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BookEditScreen(book: book),
-                      ),
-                    );
+                    // Ir a la pantalla de edición
                   },
                   child: Icon(Icons.edit, color: AppColors.textPrimary, size: 32),
                 ),
@@ -238,8 +263,10 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
                     padding: const EdgeInsets.all(16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  onPressed: () => _showDeleteConfirmationDialog(context),
-                  child: Icon(Icons.delete, color: AppColors.textPrimary, size: 32),
+                  onPressed: _isDeleting ? null : () => _showDeleteConfirmationDialog(context),
+                  child: _isDeleting
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Icon(Icons.delete, color: AppColors.textPrimary, size: 32),
                 ),
               ],
             ),

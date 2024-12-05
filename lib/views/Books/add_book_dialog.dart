@@ -25,7 +25,6 @@ class _AddBookDialogState extends State<AddBookDialog> {
 
   String? _thumbnailUrl;
   bool _isLoading = false;
-  bool _showFullDescription = false;
   final List<Book> _searchResults = [];
   final List<File> _uploadedPhotos = [];
 
@@ -65,7 +64,7 @@ class _AddBookDialogState extends State<AddBookDialog> {
     }
   }
 
- Future<void> _addBookToUser() async {
+Future<void> _addBookToUser() async {
   try {
     if (_titleController.text.trim().isEmpty ||
         _conditionController.text.trim().isEmpty ||
@@ -84,11 +83,14 @@ class _AddBookDialogState extends State<AddBookDialog> {
     );
 
     if (!mounted) return;
+
+    // Mostrar un mensaje de éxito
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Libro agregado con éxito')),
     );
 
-    Navigator.pop(context);
+    // Cierra el diálogo e informa al ProfileScreen que debe actualizar la lista
+    Navigator.pop(context, true); // Retorna "true" al perfil para actualizar
   } catch (e) {
     if (!mounted) return;
     print("Error al agregar libro: $e");

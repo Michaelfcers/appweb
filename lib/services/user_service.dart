@@ -113,4 +113,54 @@ class UserService {
       rethrow;
     }
   }
+
+  // Actualizar un libro existente
+ Future<void> updateBook({
+  required String bookId,
+  required String title,
+  required String description,
+  required String condition, // Incluye el campo condición
+}) async {
+  try {
+    final response = await _supabase.from('books').update({
+      'title': title,
+      'synopsis': description,
+      'condition': condition, // Actualización de condición
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', bookId).select();
+
+    // Verifica si la respuesta es una lista vacía o no válida
+    if (response == null || (response is List && response.isEmpty)) {
+      throw Exception('No se pudo actualizar el libro. Respuesta inesperada.');
+    }
+
+    print("Libro actualizado correctamente. Respuesta:");
+    print(response);
+  } catch (e) {
+    print('Error al actualizar el libro: $e');
+    rethrow;
+  }
+}
+
+// Método para eliminar un libro
+Future<void> deleteBook(String bookId) async {
+  try {
+    final response = await _supabase
+        .from('books')
+        .delete()
+        .eq('id', bookId)
+        .select();
+
+    if (response == null || response.isEmpty) {
+      throw Exception("No se pudo eliminar el libro. Respuesta inesperada.");
+    }
+
+    print("Libro eliminado correctamente.");
+  } catch (e) {
+    print("Error al eliminar el libro: $e");
+    rethrow; // Vuelve a lanzar la excepción para manejarla en el UI
+  }
+}
+
+
 }

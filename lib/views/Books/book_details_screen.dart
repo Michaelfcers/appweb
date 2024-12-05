@@ -1,4 +1,3 @@
-// lib/views/Books/book_details_screen.dart
 import 'package:flutter/material.dart';
 import '../../models/book_model.dart';
 import 'trade_proposal_screen.dart';
@@ -75,7 +74,8 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
                 children: [
                   TextSpan(
                     text: 'Autor: ',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                   TextSpan(
                     text: book.author,
@@ -83,7 +83,8 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
                   ),
                   TextSpan(
                     text: ' | Género: ',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                   TextSpan(
                     text: book.genre ?? 'Sin género especificado',
@@ -109,7 +110,9 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
                     return Icon(
                       Icons.star,
                       size: 24,
-                      color: index < (book.rating ?? 4) ? Colors.amber : AppColors.shadow,
+                      color: index < (book.rating ?? 4)
+                          ? Colors.amber
+                          : AppColors.shadow,
                     );
                   }),
                 ),
@@ -125,11 +128,16 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
             // Sinopsis con opción de ver más
             Text(
               "Sinopsis",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.iconSelected),
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.iconSelected),
             ),
             const SizedBox(height: 12),
             Text(
-              book.description?.isNotEmpty == true ? book.description! : "Sin descripción disponible.",
+              book.description?.isNotEmpty == true
+                  ? book.description!
+                  : "Sin descripción disponible.",
               textAlign: TextAlign.justify,
               maxLines: isExpanded ? null : 5,
               overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
@@ -163,19 +171,36 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.iconSelected,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () {
                 // Libros ficticios para propuesta de trueque
                 List<Book> fakeAvailableBooks = [
-                  Book(title: 'Libro A', author: 'Autor A', thumbnail: 'https://via.placeholder.com/150'),
-                  Book(title: 'Libro B', author: 'Autor B', thumbnail: 'https://via.placeholder.com/150'),
-                  Book(title: 'Libro C', author: 'Autor C', thumbnail: 'https://via.placeholder.com/150'),
+                  Book(
+                    id: '1',
+                    title: 'Libro A',
+                    author: 'Autor A',
+                    thumbnail: 'https://via.placeholder.com/150',
+                  ),
+                  Book(
+                    id: '2',
+                    title: 'Libro B',
+                    author: 'Autor B',
+                    thumbnail: 'https://via.placeholder.com/150',
+                  ),
+                  Book(
+                    id: '3',
+                    title: 'Libro C',
+                    author: 'Autor C',
+                    thumbnail: 'https://via.placeholder.com/150',
+                  ),
                 ];
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => TradeProposalScreen(availableBooks: fakeAvailableBooks),
+                    builder: (context) =>
+                        TradeProposalScreen(availableBooks: fakeAvailableBooks),
                   ),
                 );
               },

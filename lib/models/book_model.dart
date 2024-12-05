@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 class Book {
+  final String id; // Identificador único del libro
   final String title;
   final String author;
   final String thumbnail;
@@ -12,6 +13,7 @@ class Book {
   final List<String>? photos;
 
   Book({
+    required this.id, // Ahora incluye el campo `id`
     required this.title,
     required this.author,
     required this.thumbnail,
@@ -27,6 +29,7 @@ class Book {
   factory Book.fromGoogleJson(Map<String, dynamic> json) {
     final volumeInfo = json['volumeInfo'];
     return Book(
+      id: '', // Google Books API no tiene `id`, lo dejamos vacío
       title: volumeInfo['title'] ?? 'Título desconocido',
       author: (volumeInfo['authors'] != null && volumeInfo['authors'].isNotEmpty)
           ? volumeInfo['authors'][0]
@@ -47,6 +50,7 @@ class Book {
   // Método para crear una instancia de Book desde JSON de Supabase
   factory Book.fromSupabaseJson(Map<String, dynamic> json) {
     return Book(
+      id: json['id'] ?? '', // Recuperamos el id del libro desde Supabase
       title: json['title'] ?? 'Título desconocido',
       author: json['author'] ?? 'Autor desconocido',
       thumbnail: json['cover_url'] ?? 'https://via.placeholder.com/150',
@@ -59,5 +63,21 @@ class Book {
           ? List<String>.from(jsonDecode(json['photos']))
           : null,
     );
+  }
+
+  // Método para convertir un objeto Book a JSON (útil para actualizar libros)
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'author': author,
+      'cover_url': thumbnail,
+      'genre': genre,
+      'rating': rating,
+      'synopsis': description,
+      'condition': condition,
+      'user_id': userId,
+      'photos': photos != null ? jsonEncode(photos) : null,
+    };
   }
 }

@@ -49,7 +49,6 @@ class ProfileScreenState extends State<ProfileScreen> {
   // Método para obtener los libros subidos por el usuario
   Future<void> fetchUploadedBooks() async {
     try {
-      // Llama al servicio para obtener libros subidos por el usuario
       final books = await userService.getUploadedBooks();
       setState(() {
         uploadedBooks = books; // Asignamos los libros obtenidos
@@ -202,11 +201,15 @@ class ProfileScreenState extends State<ProfileScreen> {
         itemBuilder: (context, index) {
           if (index == 0) {
             return GestureDetector(
-              onTap: () {
-                showDialog(
+              onTap: () async {
+                final shouldUpdate = await showDialog<bool>(
                   context: context,
                   builder: (BuildContext context) => const AddBookDialog(),
                 );
+
+                if (shouldUpdate == true) {
+                  await fetchUploadedBooks();
+                }
               },
               child: Card(
                 color: AppColors.cardBackground,
@@ -237,13 +240,25 @@ class ProfileScreenState extends State<ProfileScreen> {
           } else {
             final book = uploadedBooks[index - 1];
             return GestureDetector(
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                final shouldUpdate = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => BookDetailsScreen(book: book),
+                    builder: (context) => BookDetailsScreen(
+                      book: book,
+                      onDelete: (deletedBookId) {
+                        setState(() {
+                          uploadedBooks
+                              .removeWhere((b) => b.id == deletedBookId);
+                        });
+                      },
+                    ),
                   ),
                 );
+
+                if (shouldUpdate == true) {
+                  await fetchUploadedBooks();
+                }
               },
               child: Card(
                 color: AppColors.cardBackground,
@@ -327,8 +342,7 @@ class ProfileScreenState extends State<ProfileScreen> {
           color: AppColors.cardBackground,
           margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 16),
           child: ListTile(
-            leading: Icon(Icons.emoji_events,
-                color: AppColors.iconSelected),
+            leading: Icon(Icons.emoji_events, color: AppColors.iconSelected),
             title: Text(
               achievement["title"]!,
               style: TextStyle(color: AppColors.textSecondary),
