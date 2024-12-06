@@ -221,20 +221,25 @@ class UserService {
     }
   }
 
-  // Notificar a un usuario sobre una propuesta
-  Future<void> notifyUser({
-    required String receiverId,
-    required String message,
-  }) async {
-    try {
-      await _supabase.from('notifications').insert({
-        'user_id': receiverId,
-        'message': message,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      print("Error al enviar notificación: $e");
-      throw Exception("Error al enviar notificación: $e");
-    }
+// Notificar a un usuario sobre una propuesta
+Future<void> notifyUser({
+  required String receiverId,
+  required String content,
+  required String type, // Tipo de notificación, asegurarte que sea válido
+}) async {
+  try {
+    // Usa un tipo válido como 'trade_request' o el que esté definido en tu enum
+    await _supabase.from('notifications').insert({
+      'user_id': receiverId,
+      'type': type, // Asegúrate que este valor sea válido según tu base de datos
+      'content': content,
+      'read': false,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  } catch (e) {
+    print("Error al enviar notificación: $e");
+    throw Exception("Error al enviar notificación: $e");
   }
+}
+
 }
