@@ -75,7 +75,8 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
                   TextSpan(
                     text: 'Autor: ',
                     style: TextStyle(
-                        fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary),
                   ),
                   TextSpan(
                     text: book.author,
@@ -84,7 +85,8 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
                   TextSpan(
                     text: ' | Género: ',
                     style: TextStyle(
-                        fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary),
                   ),
                   TextSpan(
                     text: book.genre ?? 'Sin género especificado',
@@ -148,7 +150,8 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
                 child: TextButton(
                   onPressed: () => setState(() => isExpanded = !isExpanded),
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
                     backgroundColor: AppColors.iconSelected.withOpacity(0.1),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -170,37 +173,18 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.iconSelected,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 32, vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () {
-                // Libros ficticios para propuesta de trueque
-                List<Book> fakeAvailableBooks = [
-                  Book(
-                    id: '1',
-                    title: 'Libro A',
-                    author: 'Autor A',
-                    thumbnail: 'https://via.placeholder.com/150',
-                  ),
-                  Book(
-                    id: '2',
-                    title: 'Libro B',
-                    author: 'Autor B',
-                    thumbnail: 'https://via.placeholder.com/150',
-                  ),
-                  Book(
-                    id: '3',
-                    title: 'Libro C',
-                    author: 'Autor C',
-                    thumbnail: 'https://via.placeholder.com/150',
-                  ),
-                ];
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        TradeProposalScreen(availableBooks: fakeAvailableBooks),
+                    builder: (context) => TradeProposalScreen(
+                      receiverId: book.userId ?? "unknown",
+                    ),
                   ),
                 );
               },

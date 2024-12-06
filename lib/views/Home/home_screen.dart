@@ -4,14 +4,14 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../models/book_model.dart';
-import '../../services/google_books_service.dart';
+import '../../services/user_service.dart';
 import '../Layout/layout.dart';
 import '../Books/add_book_dialog.dart';
 import '../Notifications/notifications_screen.dart';
 import '../Messages/messages_screen.dart';
 import '../Books/book_details_screen.dart';
 import '../../styles/colors.dart';
-import '../../auth_notifier.dart'; // Importamos AuthNotifier
+import '../../auth_notifier.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,7 +21,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class HomeScreenState extends State<HomeScreen> {
-  final GoogleBooksService booksService = GoogleBooksService();
+  final UserService userService = UserService();
   List<Book> featuredBooks = [];
   List<Book> recommendedBooks = [];
   List<Book> popularBooks = [];
@@ -35,20 +35,20 @@ class HomeScreenState extends State<HomeScreen> {
 
   Future<void> fetchBooks() async {
     try {
-      final featured = await booksService.fetchBooks('flutter');
-      final recommended = await booksService.fetchBooks('dart programming');
-      final popular = await booksService.fetchBooks('technology');
+      // Obtén los libros de la base de datos (libros subidos por otros usuarios)
+      final books = await userService.getBooksFromOtherUsers();
 
       if (!mounted) return;
 
       setState(() {
-        featuredBooks = featured;
-        recommendedBooks = recommended;
-        popularBooks = popular;
+        // Dividimos los libros en categorías para mostrarlos en secciones
+        featuredBooks = books.take(5).toList(); // Los primeros 5 libros
+        recommendedBooks = books.skip(5).take(5).toList(); // Los siguientes 5
+        popularBooks = books.skip(10).take(5).toList(); // Los siguientes 5
         isLoading = false;
       });
     } catch (error) {
-      debugPrint('Error: $error');
+      debugPrint('Error al cargar libros: $error');
       if (!mounted) return;
 
       setState(() {
@@ -195,7 +195,7 @@ class HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: Hero(
-                    tag: 'book-${book.title}',
+                    tag: 'book-${book.id}',
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: const BorderRadius.only(
