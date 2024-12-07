@@ -99,7 +99,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  Future<void> _openTradeProposalDialog(Map<String, dynamic> notification) async {
+ Future<void> _openTradeProposalDialog(Map<String, dynamic> notification) async {
   debugPrint('Intentando abrir el diálogo para la notificación: $notification');
 
   if (notification['barter_id'] == null) {
@@ -116,6 +116,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     // Conversión de books a List<Map<String, dynamic>>
     final books = List<Map<String, dynamic>>.from(tradeDetails['books']);
+    final barterStatus = tradeDetails['barter']['status']; // Obtenemos el estado
 
     showDialog(
       context: context,
@@ -124,6 +125,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         proposerName: tradeDetails['proposer']['name'],
         barterId: tradeDetails['barter']['id'],
         books: books, // Pasa la lista convertida
+        status: barterStatus, // Pasamos el estado actual
       ),
     );
   } catch (e) {
@@ -131,6 +133,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _showErrorDialog(context, 'No se pudo abrir la propuesta.');
   }
 }
+
 
   void _showErrorDialog(BuildContext context, String message) {
     showDialog(
@@ -148,18 +151,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  IconData _getIconForType(String type) {
-    switch (type) {
-      case 'trade_request':
-        return Icons.card_giftcard;
-      case 'trade_accepted':
-        return Icons.check_circle;
-      case 'trade_rejected':
-        return Icons.cancel;
-      default:
-        return Icons.notifications;
-    }
+ IconData _getIconForType(String type) {
+  switch (type) {
+    case 'trade_request':
+      return Icons.mail; // Ícono de sobre para representar una notificación
+    case 'trade_accepted':
+      return Icons.thumb_up; // Aceptación más amigable
+    case 'trade_rejected':
+      return Icons.thumb_down; // Rechazo más claro
+    default:
+      return Icons.notifications; // Notificación genérica
   }
+}
+
 
   String _getTitleForType(String type) {
     switch (type) {
@@ -250,21 +254,39 @@ class NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: isRead ? AppColors.cardBackground : AppColors.cardBackground,
-      margin: const EdgeInsets.symmetric(vertical: 5),
+      color: isRead
+          ? AppColors.notificationReadBackground
+          : AppColors.notificationUnreadBackground,
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isRead ? AppColors.textSecondary : AppColors.primary,
+          width: 1.5,
+        ),
+      ),
+      elevation: isRead ? 1 : 4,
       child: ListTile(
-        leading: Icon(icon, color: AppColors.iconSelected, size: 30),
+        leading: Icon(
+          icon,
+          color: isRead ? AppColors.textSecondary : AppColors.iconSelected,
+          size: 30,
+        ),
         title: Text(
           title,
           style: TextStyle(
             fontSize: 18,
-            fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            color: isRead ? AppColors.notificationReadText : AppColors.notificationUnreadText,
+            decoration: isRead ? TextDecoration.lineThrough : null,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+          style: TextStyle(
+            fontSize: 14,
+            color: isRead ? AppColors.notificationReadText : AppColors.notificationUnreadText,
+          ),
         ),
         onTap: onTap,
       ),

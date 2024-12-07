@@ -34,6 +34,17 @@ class AppColors {
   static Color get dialogBackground => _isDarkMode ? grey.withOpacity(0.9) : white;
   static Color get dialogText => _isDarkMode ? white : black;
 
+  // Colores específicos para notificaciones
+  static Color get notificationReadBackground =>
+      _isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0); // Fondo gris claro
+  static Color get notificationUnreadBackground =>
+      _isDarkMode ? const Color(0xFF383838) : white; // Blanco o gris oscuro
+  static Color get notificationReadText =>
+      _isDarkMode ? const Color(0xFFB0B0B0) : grey; // Texto gris claro en leídas
+  static Color get notificationUnreadText => textPrimary; // Texto normal en no leídas
+  static Color get notificationTitleHighlight =>
+      _isDarkMode ? const Color(0xFFFFD700) : redDark; // Color de resaltado para el título
+
   // Crear ThemeData dinámicamente
   static ThemeData getThemeData(bool isDarkMode) {
     return ThemeData(
@@ -52,4 +63,3 @@ class AppColors {
     );
   }
 }
-

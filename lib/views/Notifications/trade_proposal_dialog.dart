@@ -6,6 +6,7 @@ class TradeProposalDialog extends StatelessWidget {
   final String proposerName;
   final String barterId;
   final List<Map<String, dynamic>> books;
+  final String status; // Estado actual del trueque
 
   const TradeProposalDialog({
     super.key,
@@ -13,18 +14,17 @@ class TradeProposalDialog extends StatelessWidget {
     required this.proposerName,
     required this.barterId,
     required this.books,
+    required this.status,
   });
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('Construyendo TradeProposalDialog...');
-    debugPrint('Proponente: $proposerName ($proposerNickname)');
-    debugPrint('Barter ID: $barterId');
-    debugPrint('Libros: $books');
+    final isDecisionMade = status == 'accepted' || status == 'rejected';
 
     return AlertDialog(
       title: Text(
         'Propuesta de Trueque',
+        textAlign: TextAlign.center,
         style: const TextStyle(fontWeight: FontWeight.bold),
       ),
       content: SingleChildScrollView(
@@ -33,6 +33,7 @@ class TradeProposalDialog extends StatelessWidget {
           children: [
             Text(
               'Proponente: $proposerName ($proposerNickname)',
+              textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 15),
@@ -73,26 +74,38 @@ class TradeProposalDialog extends StatelessWidget {
       ),
       actions: [
         TextButton(
-          onPressed: () {
-            debugPrint('Cerrando el diálogo.');
-            Navigator.of(context).pop();
-          },
-          child: const Text('Decidir más tarde'),
+          onPressed: isDecisionMade
+              ? null
+              : () {
+                  Navigator.of(context).pop();
+                },
+          child: Text(
+            'Decidir más tarde',
+            style: TextStyle(
+              color: isDecisionMade ? Colors.grey : Colors.blue,
+            ),
+          ),
         ),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-          onPressed: () {
-            debugPrint('Aceptar Trueque presionado.');
-            _respondToProposal(context, barterId, 'accepted');
-          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isDecisionMade ? Colors.grey : Colors.green,
+          ),
+          onPressed: isDecisionMade
+              ? null
+              : () {
+                  _respondToProposal(context, barterId, 'accepted');
+                },
           child: const Text('Aceptar Trueque'),
         ),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          onPressed: () {
-            debugPrint('Rechazar Trueque presionado.');
-            _respondToProposal(context, barterId, 'rejected');
-          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isDecisionMade ? Colors.grey : Colors.red,
+          ),
+          onPressed: isDecisionMade
+              ? null
+              : () {
+                  _respondToProposal(context, barterId, 'rejected');
+                },
           child: const Text('Rechazar Trueque'),
         ),
       ],
@@ -100,48 +113,30 @@ class TradeProposalDialog extends StatelessWidget {
   }
 
   void _respondToProposal(BuildContext context, String barterId, String response) async {
-    debugPrint('Procesando respuesta al trueque...');
-    debugPrint('Barter ID: $barterId');
-    debugPrint('Respuesta: $response');
-
     try {
       final supabase = Supabase.instance.client;
 
-      // Actualizar el estado del trueque en la base de datos
       await supabase.from('barters').update({'status': response}).eq('id', barterId);
 
-      if (!context.mounted) {
-        debugPrint('Contexto no está montado, cancelando operación.');
-        return;
-      }
+      if (!context.mounted) return;
 
-      Navigator.of(context).pop(); // Cierra el diálogo
+      Navigator.of(context).pop();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            response == 'accepted'
-                ? 'Has aceptado el trueque.'
-                : 'Has rechazado el trueque.',
+            response == 'accepted' ? 'Has aceptado el trueque.' : 'Has rechazado el trueque.',
           ),
         ),
       );
-
-      debugPrint('Respuesta procesada exitosamente.');
     } catch (e) {
-      debugPrint('Error al procesar la respuesta al trueque: $e');
-
-      if (!context.mounted) {
-        debugPrint('Contexto no está montado, cancelando operación.');
-        return;
-      }
+      if (!context.mounted) return;
 
       _showErrorDialog(context, 'Error al procesar la respuesta al trueque.');
     }
   }
 
   void _showErrorDialog(BuildContext context, String message) {
-    debugPrint('Mostrando diálogo de error con mensaje: $message');
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -149,10 +144,7 @@ class TradeProposalDialog extends StatelessWidget {
         content: Text(message),
         actions: [
           TextButton(
-            onPressed: () {
-              debugPrint('Cerrando diálogo de error.');
-              Navigator.of(context).pop();
-            },
+            onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cerrar'),
           ),
         ],
