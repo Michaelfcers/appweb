@@ -142,6 +142,7 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
         receiverId: widget.receiverId,
         content: 'Tienes una nueva propuesta de trueque.',
         type: 'trade_request', // Cambia a un valor válido para notification_type
+        barterId: barterId, // Asegura que este valor sea correcto.
       );
 
       showSuccessDialog();

@@ -226,19 +226,146 @@ Future<void> notifyUser({
   required String receiverId,
   required String content,
   required String type, // Tipo de notificación, asegurarte que sea válido
+  String? barterId, // Agregamos barterId como opcional
 }) async {
   try {
-    // Usa un tipo válido como 'trade_request' o el que esté definido en tu enum
     await _supabase.from('notifications').insert({
       'user_id': receiverId,
-      'type': type, // Asegúrate que este valor sea válido según tu base de datos
+      'type': type,
       'content': content,
       'read': false,
+      'barter_id': barterId, // Incluimos el barter_id si está disponible
       'created_at': DateTime.now().toIso8601String(),
     });
   } catch (e) {
     print("Error al enviar notificación: $e");
     throw Exception("Error al enviar notificación: $e");
+  }
+}
+
+
+Future<Map<String, dynamic>> fetchTradeDetails(String notificationId) async {
+  print('Obteniendo detalles para la notificación: $notificationId');
+  try {
+    final notificationResponse = await _supabase
+        .from('notifications')
+        .select('id, type, content, read, user_id, barter_id')
+        .eq('id', notificationId)
+        .maybeSingle();
+
+    print('Respuesta de notificación: $notificationResponse');
+
+    if (notificationResponse == null || notificationResponse['barter_id'] == null) {
+      throw Exception('No se encontró el trueque asociado a la notificación.');
+    }
+
+    final barterId = notificationResponse['barter_id'];
+    print('Barter ID: $barterId');
+
+    final barterResponse = await _supabase
+        .from('barters')
+        .select('id, proposer_id, receiver_id, status')
+        .eq('id', barterId)
+        .maybeSingle();
+    print('Respuesta de trueque: $barterResponse');
+
+    final barterDetailsResponse = await _supabase
+        .from('barter_details')
+        .select('book_id, offered_by')
+        .eq('barter_id', barterId);
+    print('Detalles del trueque: $barterDetailsResponse');
+
+    final bookIds = barterDetailsResponse.map((detail) => detail['book_id']).toList();
+    final booksResponse = await _supabase
+        .from('books')
+        .select('id, title, author, cover_url, condition')
+        .in_('id', bookIds);
+    print('Libros involucrados: $booksResponse');
+
+    final proposerResponse = await _supabase
+        .from('users')
+        .select('nickname, name')
+        .eq('id', barterResponse['proposer_id'])
+        .maybeSingle();
+    print('Datos del proponente: $proposerResponse');
+
+    return {
+      'barter': barterResponse,
+      'details': barterDetailsResponse,
+      'books': booksResponse,
+      'proposer': proposerResponse,
+    };
+  } catch (e) {
+    print('Error al obtener detalles: $e');
+    throw Exception('Error al obtener detalles del trueque.');
+  }
+}
+
+
+
+Future<void> updateBarterStatus({
+  required String barterId,
+  required String status,
+}) async {
+  try {
+    // Actualizar estado
+    final response = await _supabase
+        .from('barters')
+        .update({'status': status, 'updated_at': DateTime.now().toIso8601String()})
+        .eq('id', barterId)
+        .select()
+        .single();
+
+    final proposerId = response['proposer_id'];
+
+    // Enviar notificación al proponente
+    await _supabase.from('notifications').insert({
+      'user_id': proposerId,
+      'type': status == 'accepted' ? 'trade_accepted' : 'trade_rejected',
+      'content': 'Tu propuesta ha sido ${status == 'accepted' ? 'aceptada' : 'rechazada'}.',
+      'read': false,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  } catch (e) {
+    print('Error al actualizar el estado del trueque: $e');
+    throw Exception('Error al actualizar el estado del trueque.');
+  }
+}
+
+// Método para aceptar/rechazar una propuesta
+Future<void> respondToTradeProposal({
+  required String barterId,
+  required String response, // 'accepted' o 'rejected'
+}) async {
+  try {
+    // Actualiza el estado de la propuesta
+    await _supabase.from('barters').update({
+      'status': response,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', barterId);
+
+    // Obtén el ID del proponente
+    final responseData = await _supabase
+        .from('barters')
+        .select('proposer_id')
+        .eq('id', barterId)
+        .single();
+
+    final proposerId = responseData['proposer_id'];
+
+    // Envía una notificación al proponente
+    await _supabase.from('notifications').insert({
+      'user_id': proposerId,
+      'type': response == 'accepted' ? 'trade_accepted' : 'trade_rejected',
+      'content': response == 'accepted'
+          ? 'Tu propuesta de trueque ha sido aceptada.'
+          : 'Tu propuesta de trueque ha sido rechazada.',
+      'read': false,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  } catch (e) {
+    print('Error al responder a la propuesta: $e');
+    throw Exception('Error al responder a la propuesta.');
   }
 }
 
