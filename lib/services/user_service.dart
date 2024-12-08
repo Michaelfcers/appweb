@@ -543,7 +543,11 @@ Future<void> checkBookUploadAchievements() async {
       3: '847f3fe1-29cd-45ee-bbad-3ebcb75d0659',
       5: '608fc2ee-7c5d-47f7-a7f0-4e7517c95fc6',
       10: '68dc0a4a-3a3c-4ad3-8e92-a2b20cea0c44',
-      15: '89adec7d-c7cb-4cbc-b0a3-fa4a18aeca99',
+
+      15: '34880b80-46a9-4335-97a7-9153a31d949e',
+      20: '44722f83-653e-44ee-9d5b-3eeb740d6f83',
+      25: '4f2cbc99-10c8-49f2-9d7f-fb071493b4ac',
+      30: '804412a2-bb1d-4b88-9b4c-843d3e8c1e12',
     };
 
     // Verificar y completar logros basados en el número de libros subidos
@@ -556,6 +560,106 @@ Future<void> checkBookUploadAchievements() async {
     print('Error al verificar logros de libros: $e');
   }
 }
+
+
+
+
+
+
+
+
+
+//------------------------------------------
+Future<void> checkTradeAchievements() async {
+  final userId = getCurrentUserId();
+
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
+  }
+
+  try {
+    // Contar el número de trueques realizados por el usuario
+    final tradeCountResponse = await _supabase
+        .from('barters')
+        .select('id', const FetchOptions(count: CountOption.exact))
+        .eq('proposer_id', userId)
+        .eq('status', 'completed'); // Solo trueques completados
+
+    final tradeCount = tradeCountResponse.count ?? 0;
+
+    // Verificar los géneros diferentes involucrados en los trueques
+    final genresResponse = await _supabase
+        .from('barters')
+        .select('barter_details(book_id)')
+        .eq('proposer_id', userId)
+        .eq('status', 'completed');
+
+    final bookIds = genresResponse.map((barter) => barter['book_id']).toList();
+
+    // Obtener géneros únicos de los libros involucrados
+    final booksResponse = await _supabase
+        .from('books')
+        .select('genre')
+        .in_('id', bookIds);
+
+    final genres = booksResponse
+        .map((book) => book['genre'])
+        .toSet(); // Usar un set para eliminar duplicados
+
+    // Lista de logros relacionados con trueques
+    final tradeAchievements = {
+      1: '<achievement_id_for_1_trade>',
+      3: '<achievement_id_for_3_trades>',
+      5: '<achievement_id_for_5_trades>',
+      10: '<achievement_id_for_10_trades>',
+    };
+
+    final genreAchievements = {
+      2: '<achievement_id_for_2_genres>',
+      3: '<achievement_id_for_3_genres>',
+      4: '<achievement_id_for_4_genres>',
+    };
+
+    // Verificar logros basados en el número de trueques
+    for (final entry in tradeAchievements.entries) {
+      if (tradeCount >= entry.key) {
+        await completeAchievement(entry.value);
+      }
+    }
+
+    // Verificar logros basados en géneros diferentes
+    for (final entry in genreAchievements.entries) {
+      if (genres.length >= entry.key) {
+        await completeAchievement(entry.value);
+      }
+    }
+  } catch (e) {
+    print('Error al verificar logros de trueques: $e');
+  }
+}
+
+
+
+Future<void> completeTrade(String barterId) async {
+  try {
+    await _supabase
+        .from('barters')
+        .update({
+          'status': 'completed',
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', barterId);
+
+    print('Trueque completado con éxito.');
+
+    // Verificar logros relacionados con trueques
+    await checkTradeAchievements();
+  } catch (e) {
+    print('Error al completar el trueque: $e');
+    throw Exception('Error al completar el trueque.');
+  }
+}
+
 
 
 
