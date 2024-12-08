@@ -34,6 +34,12 @@ class AppColors {
   static Color get dialogBackground => _isDarkMode ? grey.withOpacity(0.9) : white;
   static Color get dialogText => _isDarkMode ? white : black;
 
+
+// Colores específicos para el texto de diálogos
+  static Color get dialogTitleText => _isDarkMode ? white : black; // Títulos del diálogo
+  static Color get dialogBodyText => _isDarkMode ? white : Colors.black87; // Texto del contenido del diálogo
+
+  
   // Colores específicos para notificaciones
   static Color get notificationReadBackground =>
       _isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0); // Fondo gris claro
