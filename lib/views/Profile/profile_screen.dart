@@ -18,44 +18,73 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class ProfileScreenState extends State<ProfileScreen> {
-  final UserService userService = UserService(); // Instancia de UserService
+  final UserService userService = UserService();
   List<Book> uploadedBooks = [];
+  List<Map<String, dynamic>> achievements = [];
+  int totalXp = 0;
   bool isLoading = true;
-
-  String nickname = "Usuario"; // Nickname inicial
-  int experience = 0; // Experiencia inicial
+  String nickname = "Usuario";
   int _selectedTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    fetchUserData(); // Obtiene los datos del usuario
-    fetchUploadedBooks(); // Obtiene los libros subidos
+    fetchUserData();
+    fetchUploadedBooks();
+    fetchAchievements();
   }
 
-  // Método para obtener los datos del usuario desde Supabase
   Future<void> fetchUserData() async {
     try {
       final userProfile = await userService.getUserProfile();
       setState(() {
         nickname = userProfile['nickname'] ?? "Usuario";
-        experience = userProfile['experience'] ?? 0;
+        totalXp = userProfile['experience'] ?? 0;
       });
     } catch (error) {
       debugPrint('Error al obtener el perfil del usuario: $error');
     }
   }
 
-  // Método para obtener los libros subidos por el usuario
   Future<void> fetchUploadedBooks() async {
     try {
       final books = await userService.getUploadedBooks();
       setState(() {
-        uploadedBooks = books; // Asignamos los libros obtenidos
+        uploadedBooks = books;
         isLoading = false;
       });
     } catch (error) {
       debugPrint('Error al cargar los libros subidos: $error');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> fetchAchievements() async {
+    try {
+      // Obtener logros disponibles y completados
+      final allAchievements = await userService.fetchAllAchievements();
+      final completedAchievements = await userService.fetchUserAchievements();
+      final completedIds = completedAchievements
+          .map((achievement) => achievement['achievement_id'])
+          .toSet();
+
+      // Combinar logros y marcar los completados
+      setState(() {
+        achievements = allAchievements.map((achievement) {
+          return {
+            'id': achievement['id'],
+            'name': achievement['name'],
+            'description': achievement['description'],
+            'xp': achievement['xp'],
+            'completed': completedIds.contains(achievement['id']),
+          };
+        }).toList();
+        isLoading = false;
+      });
+    } catch (error) {
+      debugPrint('Error al obtener logros: $error');
       setState(() {
         isLoading = false;
       });
@@ -124,18 +153,18 @@ class ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       Text(
-                        'Nivel ${experience ~/ 1000} - Lector Ávido',
+                        'Nivel ${totalXp ~/ 1000} - Lector Ávido',
                         style: TextStyle(color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 10),
                       LinearProgressIndicator(
-                        value: (experience % 1000) / 1000,
+                        value: (totalXp % 1000) / 1000,
                         color: AppColors.iconSelected,
                         backgroundColor: AppColors.shadow,
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        '${experience % 1000}/1000 XP',
+                        '${totalXp % 1000}/1000 XP',
                         style: TextStyle(color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 10),
@@ -188,168 +217,139 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildBooksGrid() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 8.0,
-          crossAxisSpacing: 8.0,
-          childAspectRatio: 1.0,
-        ),
-        itemCount: uploadedBooks.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return GestureDetector(
-              onTap: () async {
-                final shouldUpdate = await showDialog<bool>(
-                  context: context,
-                  builder: (BuildContext context) => const AddBookDialog(),
-                );
-
-                if (shouldUpdate == true) {
-                  await fetchUploadedBooks();
-                }
-              },
-              child: Card(
-                color: AppColors.cardBackground,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 3,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add,
-                          color: AppColors.iconSelected, size: 36),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Agregar libro',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.iconSelected,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+    return uploadedBooks.isEmpty
+        ? Center(
+            child: Text(
+              'No has subido libros aún.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+            ),
+          )
+        : Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 8.0,
+                crossAxisSpacing: 8.0,
+                childAspectRatio: 1.0,
               ),
-            );
-          } else {
-            final book = uploadedBooks[index - 1];
-            return GestureDetector(
-              onTap: () async {
-                final shouldUpdate = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => BookDetailsScreen(
-                      book: book,
-                      onDelete: (deletedBookId) {
-                        setState(() {
-                          uploadedBooks
-                              .removeWhere((b) => b.id == deletedBookId);
-                        });
-                      },
+              itemCount: uploadedBooks.length,
+              itemBuilder: (context, index) {
+                final book = uploadedBooks[index];
+                return GestureDetector(
+                  onTap: () async {
+                    final shouldUpdate = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BookDetailsScreen(
+                          book: book,
+                          onDelete: (deletedBookId) {
+                            setState(() {
+                              uploadedBooks
+                                  .removeWhere((b) => b.id == deletedBookId);
+                            });
+                          },
+                        ),
+                      ),
+                    );
+
+                    if (shouldUpdate == true) {
+                      await fetchUploadedBooks();
+                    }
+                  },
+                  child: Card(
+                    color: AppColors.cardBackground,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 100,
+                          decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(10),
+                              topRight: Radius.circular(10),
+                            ),
+                            image: DecorationImage(
+                              image: NetworkImage(book.thumbnail),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            book.title,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text(
+                            book.author,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                     ),
                   ),
                 );
-
-                if (shouldUpdate == true) {
-                  await fetchUploadedBooks();
-                }
               },
-              child: Card(
-                color: AppColors.cardBackground,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 100,
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(10),
-                          topRight: Radius.circular(10),
-                        ),
-                        image: DecorationImage(
-                          image: NetworkImage(book.thumbnail),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        book.title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        book.author,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                ),
-              ),
-            );
-          }
-        },
-      ),
-    );
+            ),
+          );
   }
 
   Widget _buildAchievementsList() {
-    final achievements = [
-      {
-        "title": "Bibliófilo Novato",
-        "description": "Subir 5 libros para trueque."
-      },
-      {
-        "title": "Lector Ávido",
-        "description": "Realizar 10 trueques exitosos."
-      },
-      {
-        "title": "Explorador de Géneros",
-        "description": "Trueques en 5 géneros diferentes."
-      },
-    ];
-
     return ListView.builder(
       itemCount: achievements.length,
       itemBuilder: (context, index) {
         final achievement = achievements[index];
+
         return Card(
-          color: AppColors.cardBackground,
+          color: achievement['completed']
+              ? AppColors.iconSelected
+              : AppColors.cardBackground,
           margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 16),
           child: ListTile(
-            leading: Icon(Icons.emoji_events, color: AppColors.iconSelected),
+            leading: Icon(
+              Icons.emoji_events,
+              color: achievement['completed']
+                  ? AppColors.primary
+                  : AppColors.textSecondary,
+            ),
             title: Text(
-              achievement["title"]!,
-              style: TextStyle(color: AppColors.textSecondary),
+              achievement['name'],
+              style: TextStyle(
+                color: AppColors.textPrimary,
+              ),
             ),
             subtitle: Text(
-              achievement["description"]!,
-              style: TextStyle(color: AppColors.textSecondary),
+              achievement['description'],
+              style: TextStyle(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            trailing: Text(
+              '+${achievement['xp']} XP',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         );

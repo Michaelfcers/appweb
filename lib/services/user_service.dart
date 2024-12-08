@@ -38,49 +38,53 @@ class UserService {
 
   // Agregar un libro asociado al usuario logueado
   Future<void> addBookToUser({
-    required String title,
-    required String author,
-    String? genre,
-    String? description,
-    required String condition,
-    required List<String> photos,
-    required String thumbnail,
-  }) async {
-    final userId = getCurrentUserId();
+  required String title,
+  required String author,
+  String? genre,
+  String? description,
+  required String condition,
+  required List<String> photos,
+  required String thumbnail,
+}) async {
+  final userId = getCurrentUserId();
 
-    if (userId == null) {
-      throw Exception('Usuario no autenticado.');
-    }
-
-    final photosJson = jsonEncode(photos);
-
-    final bookData = {
-      'user_id': userId,
-      'title': title,
-      'author': author,
-      'genre': genre,
-      'synopsis': description,
-      'rating': 0,
-      'cover_url': thumbnail,
-      'condition': condition,
-      'photos': photosJson,
-      'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-    };
-
-    try {
-      final response = await _supabase.from('books').insert(bookData).select();
-
-      if (response == null || response.isEmpty) {
-        throw Exception("Error al agregar libro. Respuesta inesperada.");
-      }
-
-      print("Libro agregado exitosamente.");
-    } catch (e) {
-      print("Error al agregar libro: $e");
-      throw Exception("Error al agregar libro: $e");
-    }
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
   }
+
+  final photosJson = jsonEncode(photos);
+
+  final bookData = {
+    'user_id': userId,
+    'title': title,
+    'author': author,
+    'genre': genre,
+    'synopsis': description,
+    'rating': 0,
+    'cover_url': thumbnail,
+    'condition': condition,
+    'photos': photosJson,
+    'created_at': DateTime.now().toIso8601String(),
+    'updated_at': DateTime.now().toIso8601String(),
+  };
+
+  try {
+    final response = await _supabase.from('books').insert(bookData).select();
+
+    if (response == null || response.isEmpty) {
+      throw Exception("Error al agregar libro. Respuesta inesperada.");
+    }
+
+    print("Libro agregado exitosamente.");
+
+    // Verificar logros relacionados con subir libros
+    await checkBookUploadAchievements();
+  } catch (e) {
+    print("Error al agregar libro: $e");
+    throw Exception("Error al agregar libro: $e");
+  }
+}
+
 
   // Obtener libros subidos por el usuario autenticado
   Future<List<Book>> getUploadedBooks() async {
@@ -381,5 +385,180 @@ Future<List<Book>> searchBooks(String query) async {
 
     return (response.data as List).map((book) => Book.fromSupabaseJson(book)).toList();
   }
+  
+
+
+//----------------------------------------------------------------
+// LOGROS
+
+// Obtener todos los logros disponibles
+Future<List<Map<String, dynamic>>> fetchAllAchievements() async {
+  try {
+    final response = await _supabase
+        .from('achievements')
+        .select('id, name, description, xp')
+        .order('created_at', ascending: true);
+
+    if (response == null || response.isEmpty) {
+      return [];
+    }
+
+    return List<Map<String, dynamic>>.from(response);
+  } catch (e) {
+    print('Error al obtener todos los logros: $e');
+    rethrow;
+  }
+}
+
+// Obtener los logros completados por el usuario
+Future<List<Map<String, dynamic>>> fetchUserAchievements() async {
+  final userId = getCurrentUserId();
+
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
+  }
+
+  try {
+    final response = await _supabase
+        .from('user_achievements')
+        .select('achievement_id')
+        .eq('user_id', userId);
+
+    if (response == null || response.isEmpty) {
+      return [];
+    }
+
+    return List<Map<String, dynamic>>.from(response);
+  } catch (e) {
+    print('Error al obtener los logros del usuario: $e');
+    rethrow;
+  }
+}
+
+// Registrar un logro como completado
+
+Future<void> completeAchievement(String achievementId) async {
+  final userId = getCurrentUserId();
+
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
+  }
+
+  try {
+    // Verificar si el logro ya está completado
+    final existingAchievement = await _supabase
+        .from('user_achievements')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('achievement_id', achievementId)
+        .maybeSingle();
+
+    if (existingAchievement != null) {
+      print('El logro ya está completado.');
+      return;
+    }
+
+    // Registrar el logro como completado
+    await _supabase.from('user_achievements').insert({
+      'user_id': userId,
+      'achievement_id': achievementId,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
+    // Obtener los puntos de experiencia del logro
+    final achievementData = await _supabase
+        .from('achievements')
+        .select('xp')
+        .eq('id', achievementId)
+        .maybeSingle();
+
+    if (achievementData == null || achievementData['xp'] == null) {
+      throw Exception('No se encontraron datos del logro.');
+    }
+
+    final xp = achievementData['xp'];
+
+    // Actualizar la experiencia del usuario
+    await _supabase
+        .from('users')
+        .update({
+          'experience': xp,
+        })
+        .eq('id', userId);
+  } catch (e) {
+    print('Error al completar el logro: $e');
+    rethrow;
+  }
+}
+
+// Obtener el progreso de logros combinando todos los logros con los completados
+Future<List<Map<String, dynamic>>> fetchAchievementsWithProgress() async {
+  try {
+    // Obtener todos los logros
+    final allAchievements = await fetchAllAchievements();
+
+    // Obtener logros completados
+    final completedAchievements = await fetchUserAchievements();
+    final completedIds = completedAchievements
+        .map((achievement) => achievement['achievement_id'])
+        .toSet();
+
+    // Combinar todos los logros y marcar los completados
+    return allAchievements.map((achievement) {
+      return {
+        'id': achievement['id'],
+        'name': achievement['name'],
+        'description': achievement['description'],
+        'xp': achievement['xp'],
+        'completed': completedIds.contains(achievement['id']),
+      };
+    }).toList();
+  } catch (e) {
+    print('Error al combinar logros con progreso: $e');
+    rethrow;
+  }
+}
+
+//------------------
+
+Future<void> checkBookUploadAchievements() async {
+  final userId = getCurrentUserId();
+
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
+  }
+
+  try {
+    // Contar el número de libros subidos por el usuario
+    final response = await _supabase
+        .from('books')
+        .select('id', const FetchOptions(count: CountOption.exact))
+        .eq('user_id', userId);
+
+    final bookCount = response.count ?? 0;
+
+    // Lista de logros relacionados con subir libros
+    final achievements = {
+      1: 'ffd07138-4020-4ca5-b1ef-fa199042db23', 
+      3: '847f3fe1-29cd-45ee-bbad-3ebcb75d0659',
+      5: '608fc2ee-7c5d-47f7-a7f0-4e7517c95fc6',
+      10: '68dc0a4a-3a3c-4ad3-8e92-a2b20cea0c44',
+      15: '89adec7d-c7cb-4cbc-b0a3-fa4a18aeca99',
+    };
+
+    // Verificar y completar logros basados en el número de libros subidos
+    for (final entry in achievements.entries) {
+      if (bookCount >= entry.key) {
+        await completeAchievement(entry.value);
+      }
+    }
+  } catch (e) {
+    print('Error al verificar logros de libros: $e');
+  }
+}
+
+
+
+  
 }
 
