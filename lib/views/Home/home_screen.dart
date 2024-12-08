@@ -23,8 +23,8 @@ class HomeScreen extends StatefulWidget {
 class HomeScreenState extends State<HomeScreen> {
   final UserService userService = UserService();
   List<Book> featuredBooks = [];
-  List<Book> recommendedBooks = [];
-  List<Book> popularBooks = [];
+  List<Book> recommendedBooks = []; // Bloqueado para no llenarse con libros
+  List<Book> popularBooks = []; // Bloqueado para no llenarse con libros
   bool isLoading = true;
 
   @override
@@ -41,10 +41,9 @@ class HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       setState(() {
-        // Dividimos los libros en categorías para mostrarlos en secciones
-        featuredBooks = books.take(5).toList(); // Los primeros 5 libros
-        recommendedBooks = books.skip(5).take(5).toList(); // Los siguientes 5
-        popularBooks = books.skip(10).take(5).toList(); // Los siguientes 5
+        // Solo llenamos la sección "Libros Destacados"
+        featuredBooks = books.take(5).toList();
+        // Las secciones "Recomendados" y "Populares" permanecerán vacías
         isLoading = false;
       });
     } catch (error) {
@@ -64,7 +63,8 @@ class HomeScreenState extends State<HomeScreen> {
     // Si el usuario no está logueado, redirigimos al HomeScreenLoggedOut
     if (!authNotifier.isLoggedIn) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacementNamed(context, '/homeLoggedOut'); // Ruta de HomeScreenLoggedOut
+        Navigator.pushReplacementNamed(
+            context, '/homeLoggedOut'); // Ruta de HomeScreenLoggedOut
       });
       return Container(); // Contenedor vacío mientras se redirige
     }
@@ -89,7 +89,8 @@ class HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const MessagesScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const MessagesScreen()),
                 );
               },
             ),
@@ -98,7 +99,8 @@ class HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen()),
                 );
               },
             ),
@@ -116,15 +118,15 @@ class HomeScreenState extends State<HomeScreen> {
                     children: [
                       _buildSectionTitle("Libros Destacados"),
                       const SizedBox(height: 10),
-                      _buildCarousel(featuredBooks),
+                      _buildCarousel(featuredBooks, "featured"),
                       const SizedBox(height: 20),
                       _buildSectionTitle("Recomendados para Ti"),
                       const SizedBox(height: 10),
-                      _buildCarousel(recommendedBooks),
+                      _buildCarousel(recommendedBooks, "recommended"),
                       const SizedBox(height: 20),
                       _buildSectionTitle("Libros Populares"),
                       const SizedBox(height: 10),
-                      _buildCarousel(popularBooks),
+                      _buildCarousel(popularBooks, "popular"),
                     ],
                   ),
                 ),
@@ -155,7 +157,22 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCarousel(List<Book> books) {
+  Widget _buildCarousel(List<Book> books, String sectionName) {
+    if (books.isEmpty) {
+      // Si no hay libros, mostramos un placeholder vacío
+      return Container(
+        height: 280,
+        alignment: Alignment.center,
+        child: Text(
+          "Sin contenido disponible",
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
     return CarouselSlider(
       options: CarouselOptions(
         height: 280,
@@ -166,13 +183,22 @@ class HomeScreenState extends State<HomeScreen> {
         autoPlayAnimationDuration: const Duration(milliseconds: 800),
         autoPlayCurve: Curves.fastOutSlowIn,
       ),
-      items: books.map((book) {
+      items: books.asMap().entries.map((entry) {
+        final index = entry.key;
+        final book = entry.value;
+
+        // Hero tag único basado en la sección y el índice
+        final heroTag = '$sectionName-${book.id ?? book.title}-$index';
+
         return GestureDetector(
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => BookDetailsScreen(book: book),
+                builder: (context) => BookDetailsScreen(
+                  book: book,
+                  heroTag: heroTag,
+                ),
               ),
             );
           },
@@ -195,7 +221,7 @@ class HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: Hero(
-                    tag: 'book-${book.id}',
+                    tag: heroTag,
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: const BorderRadius.only(
@@ -271,10 +297,7 @@ class HomeScreenState extends State<HomeScreen> {
         height: 280,
         enlargeCenterPage: true,
         viewportFraction: 0.6,
-        autoPlay: true,
-        autoPlayInterval: const Duration(seconds: 5),
-        autoPlayAnimationDuration: const Duration(milliseconds: 800),
-        autoPlayCurve: Curves.fastOutSlowIn,
+        autoPlay: false,
       ),
       items: List.generate(5, (index) {
         return Shimmer.fromColors(

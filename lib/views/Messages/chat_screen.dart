@@ -15,6 +15,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   List<Map<String, dynamic>> messages = [];
   late RealtimeChannel _realtimeChannel;
 
@@ -36,6 +37,9 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         messages = List<Map<String, dynamic>>.from(response);
       });
+
+      // Desplázate al último mensaje después de cargar los mensajes
+      _scrollToBottom();
     } catch (e) {
       debugPrint('Error al obtener mensajes: $e');
     }
@@ -53,53 +57,67 @@ class _ChatScreenState extends State<ChatScreen> {
         filter: 'barter_id=eq.${widget.barterId}',
       ),
       (payload, [ref]) {
+        debugPrint('Nuevo mensaje recibido: $payload');
         final newMessage = payload['new'] as Map<String, dynamic>;
-        setState(() {
-          messages.add(newMessage);
-          messages.sort((a, b) => DateTime.parse(a['created_at']).compareTo(DateTime.parse(b['created_at'])));
-        });
+
+        if (newMessage['barter_id'] == widget.barterId) {
+          setState(() {
+            messages.add(newMessage);
+            messages.sort((a, b) => DateTime.parse(a['created_at'])
+                .compareTo(DateTime.parse(b['created_at'])));
+          });
+
+          // Desplázate al último mensaje cuando llegue uno nuevo
+          _scrollToBottom();
+        }
       },
     );
 
     _realtimeChannel.subscribe();
   }
 
-Future<void> _sendMessage() async {
-  final messageText = _messageController.text.trim();
-  if (messageText.isEmpty) return;
-
-  final newMessage = {
-    'barter_id': widget.barterId,
-    'sender_id': _supabase.auth.currentUser!.id,
-    'receiver_id': null, // Puedes ajustar esto según el caso
-    'message': messageText,
-    'created_at': DateTime.now().toIso8601String(),
-  };
-
-  setState(() {
-    // Añadir el mensaje localmente antes de enviar a la base de datos
-    messages.add(newMessage);
-    _messageController.clear();
-  });
-
-  try {
-    // Enviar el mensaje a la base de datos
-    await _supabase.from('messages').insert(newMessage);
-  } catch (e) {
-    debugPrint('Error al enviar mensaje: $e');
-    // Opcionalmente, podrías eliminar el mensaje de la lista si la inserción falla
-    setState(() {
-      messages.remove(newMessage);
-    });
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
-}
 
+  Future<void> _sendMessage() async {
+    final messageText = _messageController.text.trim();
+    if (messageText.isEmpty) return;
 
+    final newMessage = {
+      'barter_id': widget.barterId,
+      'sender_id': _supabase.auth.currentUser!.id,
+      'receiver_id': null, // Ajusta esto según el caso
+      'message': messageText,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    setState(() {
+      messages.add(newMessage);
+      _messageController.clear();
+    });
+
+    try {
+      await _supabase.from('messages').insert(newMessage);
+    } catch (e) {
+      debugPrint('Error al enviar mensaje: $e');
+      setState(() {
+        messages.remove(newMessage);
+      });
+    }
+  }
 
   @override
   void dispose() {
     _realtimeChannel.unsubscribe();
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -126,11 +144,13 @@ Future<void> _sendMessage() async {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               itemCount: messages.length,
               itemBuilder: (context, index) {
                 final message = messages[index];
-                final isSender = message['sender_id'] == _supabase.auth.currentUser!.id;
+                final isSender =
+                    message['sender_id'] == _supabase.auth.currentUser!.id;
                 return Align(
                   alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
                   child: BubbleMessage(

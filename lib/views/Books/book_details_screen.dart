@@ -5,8 +5,9 @@ import '../../styles/colors.dart';
 
 class BookDetailsScreen extends StatefulWidget {
   final Book book;
+  final String heroTag; // Agregado para soporte de Hero
 
-  const BookDetailsScreen({super.key, required this.book});
+  const BookDetailsScreen({super.key, required this.book, required this.heroTag});
 
   @override
   State<BookDetailsScreen> createState() => _BookDetailsScreenState();
@@ -37,22 +38,25 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Imagen del libro
-            Container(
-              width: 160,
-              height: 220,
-              decoration: BoxDecoration(
-                color: AppColors.shadow,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: book.thumbnail.isNotEmpty
-                  ? Image.network(book.thumbnail, fit: BoxFit.cover)
-                  : Center(
-                      child: Text(
-                        '160 x 220',
-                        style: TextStyle(color: AppColors.textPrimary),
+            // Imagen del libro con Hero
+            Hero(
+              tag: widget.heroTag, // Usamos el heroTag para la animación
+              child: Container(
+                width: 160,
+                height: 220,
+                decoration: BoxDecoration(
+                  color: AppColors.shadow,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: book.thumbnail.isNotEmpty
+                    ? Image.network(book.thumbnail, fit: BoxFit.cover)
+                    : Center(
+                        child: Text(
+                          '160 x 220',
+                          style: TextStyle(color: AppColors.textPrimary),
+                        ),
                       ),
-                    ),
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -68,7 +72,7 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Información del autor y género en una línea
+            // Información del autor y género
             Text.rich(
               TextSpan(
                 children: [

@@ -369,4 +369,17 @@ Future<void> respondToTradeProposal({
   }
 }
 
+Future<List<Book>> searchBooks(String query) async {
+    final response = await _supabase
+        .from('books')
+        .select()
+        .ilike('title', '%$query%'); // Busca por título de forma insensible a mayúsculas
+
+    if (response.error != null) {
+      throw Exception('Error al buscar libros: ${response.error!.message}');
+    }
+
+    return (response.data as List).map((book) => Book.fromSupabaseJson(book)).toList();
+  }
 }
+

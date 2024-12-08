@@ -106,21 +106,22 @@ class _HomeScreenLoggedOutState extends State<HomeScreenLoggedOut> {
                   color: AppColors.primary,
                   onRefresh: fetchBooks,
                   child: ListView(
-                    padding: const EdgeInsets.all(16.0),
-                    children: [
-                      _buildSectionTitle("Libros Destacados"),
-                      const SizedBox(height: 10),
-                      _buildCarousel(featuredBooks),
-                      const SizedBox(height: 20),
-                      _buildSectionTitle("Recomendados para Ti"),
-                      const SizedBox(height: 10),
-                      _buildCarousel(recommendedBooks),
-                      const SizedBox(height: 20),
-                      _buildSectionTitle("Libros Populares"),
-                      const SizedBox(height: 10),
-                      _buildCarousel(popularBooks),
-                    ],
-                  ),
+  padding: const EdgeInsets.all(16.0),
+  children: [
+    _buildSectionTitle("Libros Destacados"),
+    const SizedBox(height: 10),
+    _buildCarousel(featuredBooks, "featured"),
+    const SizedBox(height: 20),
+    _buildSectionTitle("Recomendados para Ti"),
+    const SizedBox(height: 10),
+    _buildCarousel(recommendedBooks, "recommended"),
+    const SizedBox(height: 20),
+    _buildSectionTitle("Libros Populares"),
+    const SizedBox(height: 10),
+    _buildCarousel(popularBooks, "popular"),
+  ],
+),
+
                 ),
         ),
         floatingActionButton: FloatingActionButton(
@@ -224,96 +225,107 @@ class _HomeScreenLoggedOutState extends State<HomeScreenLoggedOut> {
     );
   }
 
-  Widget _buildCarousel(List<Book> books) {
-    return CarouselSlider(
-      options: CarouselOptions(
-        height: 280,
-        enlargeCenterPage: true,
-        viewportFraction: 0.6,
-        autoPlay: true,
-        autoPlayInterval: const Duration(seconds: 5),
-        autoPlayAnimationDuration: const Duration(milliseconds: 800),
-        autoPlayCurve: Curves.fastOutSlowIn,
-      ),
-      items: books.map((book) {
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => BookDetailsScreen(book: book),
+  Widget _buildCarousel(List<Book> books, String sectionName) {
+  return CarouselSlider(
+    options: CarouselOptions(
+      height: 280,
+      enlargeCenterPage: true,
+      viewportFraction: 0.6,
+      autoPlay: true,
+      autoPlayInterval: const Duration(seconds: 5),
+      autoPlayAnimationDuration: const Duration(milliseconds: 800),
+      autoPlayCurve: Curves.fastOutSlowIn,
+    ),
+    items: books.asMap().entries.map((entry) {
+      final index = entry.key;
+      final book = entry.value;
+
+      // Genera un tag único usando el nombre de la sección, el título del libro y el índice
+      final heroTag = '$sectionName-${book.id ?? book.title}-$index';
+
+      return GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => BookDetailsScreen(
+                book: book,
+                heroTag: heroTag, // Pasa el tag único a la pantalla de detalles
               ),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              color: AppColors.cardBackground,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.shadow,
-                  spreadRadius: 2,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Hero(
-                    tag: 'book-${book.title}',
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(15),
-                          topRight: Radius.circular(15),
-                        ),
-                        image: DecorationImage(
-                          image: NetworkImage(book.thumbnail),
-                          fit: BoxFit.cover,
-                        ),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            color: AppColors.cardBackground,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadow,
+                spreadRadius: 2,
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Hero(
+                  tag: heroTag, // Usa el tag único aquí
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(15),
+                        topRight: Radius.circular(15),
+                      ),
+                      image: DecorationImage(
+                        image: NetworkImage(book.thumbnail),
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        book.title,
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      book.title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        book.author,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      book.author,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
                       ),
-                    ],
-                  ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      }).toList(),
-    );
-  }
+        ),
+      );
+    }).toList(),
+  );
+}
+
+
 
   Widget _buildSkeletonLoader() {
     return ListView(
