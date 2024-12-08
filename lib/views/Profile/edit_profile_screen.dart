@@ -1,77 +1,100 @@
-// lib/views/Profile/edit_profile_screen.dart
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../styles/colors.dart';
 
-class EditProfileScreen extends StatelessWidget {
-  final TextEditingController nameController =
-      TextEditingController(text: "Usuario123");
-  final TextEditingController nicknameController =
-      TextEditingController(text: "user_nickname");
-  final TextEditingController emailController =
-      TextEditingController(text: "usuario123@example.com");
+class EditProfileScreen extends StatefulWidget {
+  const EditProfileScreen({super.key});
 
-  EditProfileScreen({super.key});
+  @override
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
+}
 
-  void _saveChanges(BuildContext context) {
-    showConfirmationDialog(context);
+class _EditProfileScreenState extends State<EditProfileScreen> {
+  final SupabaseClient _supabase = Supabase.instance.client;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text("Cambios guardados"),
-        action: SnackBarAction(
-          label: "Deshacer",
-          textColor: AppColors.iconSelected,
-          onPressed: () {
-            nameController.text = "Usuario123";
-            nicknameController.text = "user_nickname";
-            emailController.text = "usuario123@example.com";
-          },
-        ),
-      ),
-    );
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController nicknameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
   }
 
-  void showConfirmationDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.cardBackground,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: Text(
-            "¡Cambios guardados con éxito!",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.textPrimary),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 50),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.iconSelected,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                ),
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  "Aceptar",
-                  style: TextStyle(color: AppColors.textPrimary),
-                ),
-              ),
-            ],
-          ),
+  Future<void> _loadUserProfile() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    final userId = _supabase.auth.currentUser?.id;
+    final userEmail = _supabase.auth.currentUser?.email;
+
+    if (userId == null || userEmail == null) {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      // Obtenemos el perfil de la tabla `users`
+      final response = await _supabase
+          .from('users')
+          .select('name, nickname')
+          .eq('id', userId)
+          .single();
+
+      if (response != null) {
+        setState(() {
+          nameController.text = response['name'] ?? '';
+          nicknameController.text = response['nickname'] ?? '';
+          emailController.text = userEmail; // Obtenemos el correo directamente desde `auth.currentUser`
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se encontraron datos del perfil')),
         );
-      },
-    );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cargar perfil: $e')),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    final updates = {
+      'name': nameController.text.trim(),
+      'nickname': nicknameController.text.trim(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      final response = await _supabase.from('users').update(updates).eq('id', userId);
+
+      if (response.error == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Perfil actualizado con éxito')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar: ${response.error!.message}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al guardar cambios: $e')),
+      );
+    }
   }
 
   @override
@@ -89,68 +112,47 @@ class EditProfileScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-        child: Column(
-          children: [
-            Center(
-              child: Stack(
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+              child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: AppColors.shadow,
-                    child: Icon(
-                      Icons.person,
-                      size: 50,
-                      color: AppColors.textPrimary,
+                  Center(
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: AppColors.shadow,
+                      child: Icon(
+                        Icons.person,
+                        size: 50,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
-                  Positioned(
-                    bottom: 0,
-                    right: 4,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppColors.iconSelected,
-                        shape: BoxShape.circle,
+                  const SizedBox(height: 20),
+                  _buildFieldContainer("Nombre", nameController),
+                  const SizedBox(height: 20),
+                  _buildFieldContainer("Nickname", nicknameController),
+                  const SizedBox(height: 20),
+                  _buildNonEditableFieldContainer("Correo", emailController),
+                  const SizedBox(height: 30),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.iconSelected,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(
-                        Icons.camera_alt,
-                        color: AppColors.textPrimary,
-                        size: 20,
-                      ),
+                    ),
+                    onPressed: _saveChanges,
+                    child: Text(
+                      "Guardar cambios",
+                      style: TextStyle(color: AppColors.textPrimary),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            _buildFieldContainer("Nombre", nameController),
-            const SizedBox(height: 20),
-            _buildFieldContainer("Nickname", nicknameController),
-            const SizedBox(height: 20),
-            _buildFieldContainer("Correo", emailController),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.iconSelected,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              onPressed: () => _saveChanges(context),
-              child: Text(
-                "Guardar cambios",
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -169,6 +171,35 @@ class EditProfileScreen extends StatelessWidget {
         TextField(
           controller: controller,
           style: TextStyle(color: AppColors.textPrimary),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.cardBackground,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNonEditableFieldContainer(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 5),
+        TextField(
+          controller: controller,
+          enabled: false, // Campo no editable
+          style: TextStyle(color: AppColors.textSecondary),
           decoration: InputDecoration(
             filled: true,
             fillColor: AppColors.cardBackground,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Para AuthNotifier
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
@@ -9,7 +8,6 @@ import '../Notifications/notifications_screen.dart';
 import '../Messages/messages_screen.dart';
 import '../Books/book_details_screen.dart';
 import '../../styles/colors.dart';
-import '../../auth_notifier.dart'; // Para manejar la sesión del usuario
 import '../Layout/layout.dart'; // Importamos Layout
 
 class HomeScreenLoggedOut extends StatefulWidget { 
