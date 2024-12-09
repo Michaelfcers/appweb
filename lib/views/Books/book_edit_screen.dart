@@ -50,48 +50,50 @@ class _BookEditScreenState extends State<BookEditScreen> {
   }
 
   Future<void> _saveChanges() async {
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    // Llamada al servicio para actualizar el libro
+    await _userService.updateBook(
+      bookId: widget.book.id,
+      title: _titleController.text.trim(),
+      description: _synopsisController.text.trim(),
+      condition: _conditionController.text.trim(),
+    );
+
+    // Crear una copia del libro actualizado
+    final updatedBook = Book(
+      id: widget.book.id,
+      title: _titleController.text.trim(),
+      author: _authorController.text.trim(),
+      thumbnail: widget.book.thumbnail,
+      genre: _genreController.text.trim(),
+      description: _synopsisController.text.trim(),
+      condition: _conditionController.text.trim(),
+      userId: widget.book.userId,
+      photos: widget.book.photos,
+    );
+
+    if (!mounted) return;
+
+    // Mostrar diálogo de éxito
+    await _showSaveSuccessDialog();
+
+    // Retornar a la pantalla anterior con el libro actualizado
+    Navigator.pop(context, updatedBook);
+  } catch (e) {
+    if (!mounted) return;
+
+    // Mostrar diálogo de error
+    await _showSaveErrorDialog();
+  } finally {
     setState(() {
-      _isLoading = true;
+      _isLoading = false;
     });
-
-    try {
-      // Llamar al servicio para actualizar el libro
-      await _userService.updateBook(
-        bookId: widget.book.id,
-        title: _titleController.text.trim(),
-        description: _synopsisController.text.trim(),
-        condition: _conditionController.text.trim(),
-      );
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Libro editado con éxito',
-            style: TextStyle(color: AppColors.textPrimary),
-          ),
-          backgroundColor: AppColors.cardBackground,
-        ),
-      );
-
-      Navigator.pop(context, true); // Indica que se realizaron cambios
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Error al editar el libro: $e',
-            style: TextStyle(color: Colors.white),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
+}
 
   Future<void> _searchBook(String title) async {
     try {
@@ -214,32 +216,150 @@ class _BookEditScreenState extends State<BookEditScreen> {
   }
 
   Widget _buildTextField(
-    TextEditingController controller,
-    String label, {
-    required bool isEditable,
-    int maxLines = 1,
-    Function(String)? onChanged,
-  }) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      enabled: isEditable,
-      onChanged: onChanged,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: AppColors.iconSelected),
-        filled: true,
-        fillColor: AppColors.cardBackground,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.iconSelected),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.iconSelected),
-        ),
+  TextEditingController controller,
+  String label, {
+  required bool isEditable,
+  int maxLines = 1,
+  Function(String)? onChanged,
+}) {
+  return TextField(
+    controller: controller,
+    maxLines: maxLines,
+    enabled: isEditable,
+    onChanged: onChanged,
+    decoration: InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(color: AppColors.iconSelected),
+      filled: true,
+      fillColor: AppColors.cardBackground,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.iconSelected),
       ),
-      style: TextStyle(color: AppColors.textPrimary),
-    );
-  }
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.iconSelected),
+      ),
+    ),
+    style: const TextStyle(color: Colors.black), // Explicitly set text color to black
+  );
 }
+
+
+
+  Future<void> _showSaveSuccessDialog() async {
+  await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      backgroundColor: AppColors.dialogBackground,
+      contentPadding: const EdgeInsets.all(20),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_circle, color: Colors.green, size: 60),
+          const SizedBox(height: 16),
+          Text(
+            "Éxito",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.dialogTitleText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "El libro se guardó con éxito.",
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.dialogBodyText,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+      actions: [
+        Center(
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.iconSelected,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              "Aceptar",
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFFF1EFE7),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _showSaveErrorDialog() async {
+  await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      backgroundColor: AppColors.dialogBackground,
+      contentPadding: const EdgeInsets.all(20),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error, color: Colors.red, size: 60),
+          const SizedBox(height: 16),
+          Text(
+            "Error",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.dialogTitleText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "No se pudo guardar el libro. Por favor, intenta de nuevo.",
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.dialogBodyText,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+      actions: [
+        Center(
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.iconSelected,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              "Aceptar",
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFFF1EFE7),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+}
+

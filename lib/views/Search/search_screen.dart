@@ -105,9 +105,11 @@ class _SearchScreenState extends State<SearchScreen> {
                 filled: true,
                 fillColor: AppColors.cardBackground,
               ),
+              style: TextStyle(
+    color: AppColors.black, // Cambiar el color del texto ingresado
+  ),
             ),
             const SizedBox(height: 16),
-            // Botones de Géneros dinámicos
             if (_genres.isNotEmpty)
               Wrap(
                 spacing: 8.0,
@@ -172,8 +174,10 @@ class _SearchScreenState extends State<SearchScreen> {
                               ),
                               subtitle: Text(
                                 book.author,
-                                style:
-                                    TextStyle(color: AppColors.textSecondary),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
                               onTap: () {
                                 Navigator.push(

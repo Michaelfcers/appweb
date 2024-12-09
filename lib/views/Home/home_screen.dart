@@ -246,7 +246,7 @@ class HomeScreenState extends State<HomeScreen> {
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: Colors.black, // Fuerza el color negro
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

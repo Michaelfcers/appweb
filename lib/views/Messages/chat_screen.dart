@@ -167,18 +167,20 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: "Escribe un mensaje...",
-                      hintStyle: TextStyle(color: AppColors.textSecondary),
-                      filled: true,
-                      fillColor: AppColors.cardBackground,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
+  controller: _messageController,
+  style: const TextStyle(color: Colors.black), // Asegura que el texto sea negro
+  decoration: InputDecoration(
+    hintText: "Escribe un mensaje...",
+    hintStyle: TextStyle(color: AppColors.textSecondary),
+    filled: true,
+    fillColor: AppColors.cardBackground,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(25),
+      borderSide: BorderSide.none,
+    ),
+  ),
+),
+
                 ),
                 IconButton(
                   icon: Icon(Icons.send, color: AppColors.iconSelected),

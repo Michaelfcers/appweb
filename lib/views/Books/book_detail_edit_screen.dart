@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../models/book_model.dart';
 import '../../styles/colors.dart';
+import 'book_edit_screen.dart';
 import '../../services/user_service.dart';
 
 class BookDetailsScreen extends StatefulWidget {
-  final Book book;
+  Book book; // Deja de ser final para actualizarlo después de edición
   final Function(String) onDelete; // Callback para notificar la eliminación del libro
 
-  const BookDetailsScreen({
+  BookDetailsScreen({
     super.key,
     required this.book,
     required this.onDelete,
@@ -190,13 +191,13 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
                     return Icon(
                       Icons.star,
                       size: 24,
-                      color: index < (book.rating ?? 4) ? Colors.amber : AppColors.shadow,
+                      color: index < (book.rating ?? 0) ? Colors.amber : AppColors.shadow,
                     );
                   }),
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  "${book.rating ?? 4.5}/5",
+                  "${book.rating ?? 0}/5",
                   style: TextStyle(fontSize: 18, color: AppColors.textPrimary),
                 ),
               ],
@@ -242,34 +243,58 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
             const SizedBox(height: 24),
 
             // Botones de Editar y Eliminar
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.iconSelected,
-                    padding: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: () {
-                    // Ir a la pantalla de edición
-                  },
-                  child: Icon(Icons.edit, color: AppColors.textPrimary, size: 32),
-                ),
-                const SizedBox(width: 20),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    padding: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: _isDeleting ? null : () => _showDeleteConfirmationDialog(context),
-                  child: _isDeleting
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Icon(Icons.delete, color: AppColors.textPrimary, size: 32),
-                ),
-              ],
-            ),
+Row(
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
+    ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.iconSelected,
+        padding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: () async {
+        final updatedBook = await Navigator.push<Book?>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BookEditScreen(book: widget.book),
+          ),
+        );
+
+        if (updatedBook != null) {
+          setState(() {
+            // Crear un nuevo objeto de tipo Book con los valores actualizados
+            widget.book = Book(
+              id: updatedBook.id,
+              title: updatedBook.title,
+              author: updatedBook.author,
+              thumbnail: updatedBook.thumbnail,
+              genre: updatedBook.genre,
+              rating: updatedBook.rating,
+              description: updatedBook.description,
+              condition: updatedBook.condition,
+              userId: updatedBook.userId,
+              photos: updatedBook.photos,
+            );
+          });
+        }
+      },
+      child: Icon(Icons.edit, color: AppColors.textPrimary, size: 32),
+    ),
+    const SizedBox(width: 20),
+    ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.redAccent,
+        padding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: _isDeleting ? null : () => _showDeleteConfirmationDialog(context),
+      child: _isDeleting
+          ? const CircularProgressIndicator(color: Colors.white)
+          : Icon(Icons.delete, color: AppColors.textPrimary, size: 32),
+    ),
+  ],
+),
+
           ],
         ),
       ),
