@@ -38,49 +38,53 @@ class UserService {
 
   // Agregar un libro asociado al usuario logueado
   Future<void> addBookToUser({
-    required String title,
-    required String author,
-    String? genre,
-    String? description,
-    required String condition,
-    required List<String> photos,
-    required String thumbnail,
-  }) async {
-    final userId = getCurrentUserId();
+  required String title,
+  required String author,
+  String? genre,
+  String? description,
+  required String condition,
+  required List<String> photos,
+  required String thumbnail,
+}) async {
+  final userId = getCurrentUserId();
 
-    if (userId == null) {
-      throw Exception('Usuario no autenticado.');
-    }
-
-    final photosJson = jsonEncode(photos);
-
-    final bookData = {
-      'user_id': userId,
-      'title': title,
-      'author': author,
-      'genre': genre,
-      'synopsis': description,
-      'rating': 0,
-      'cover_url': thumbnail,
-      'condition': condition,
-      'photos': photosJson,
-      'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-    };
-
-    try {
-      final response = await _supabase.from('books').insert(bookData).select();
-
-      if (response == null || response.isEmpty) {
-        throw Exception("Error al agregar libro. Respuesta inesperada.");
-      }
-
-      print("Libro agregado exitosamente.");
-    } catch (e) {
-      print("Error al agregar libro: $e");
-      throw Exception("Error al agregar libro: $e");
-    }
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
   }
+
+  final photosJson = jsonEncode(photos);
+
+  final bookData = {
+    'user_id': userId,
+    'title': title,
+    'author': author,
+    'genre': genre,
+    'synopsis': description,
+    'rating': 0,
+    'cover_url': thumbnail,
+    'condition': condition,
+    'photos': photosJson,
+    'created_at': DateTime.now().toIso8601String(),
+    'updated_at': DateTime.now().toIso8601String(),
+  };
+
+  try {
+    final response = await _supabase.from('books').insert(bookData).select();
+
+    if (response == null || response.isEmpty) {
+      throw Exception("Error al agregar libro. Respuesta inesperada.");
+    }
+
+    print("Libro agregado exitosamente.");
+
+    // Verificar logros relacionados con subir libros
+    await checkBookUploadAchievements();
+  } catch (e) {
+    print("Error al agregar libro: $e");
+    throw Exception("Error al agregar libro: $e");
+  }
+}
+
 
   // Obtener libros subidos por el usuario autenticado
   Future<List<Book>> getUploadedBooks() async {
@@ -381,5 +385,284 @@ Future<List<Book>> searchBooks(String query) async {
 
     return (response.data as List).map((book) => Book.fromSupabaseJson(book)).toList();
   }
+  
+
+
+//----------------------------------------------------------------
+// LOGROS
+
+// Obtener todos los logros disponibles
+Future<List<Map<String, dynamic>>> fetchAllAchievements() async {
+  try {
+    final response = await _supabase
+        .from('achievements')
+        .select('id, name, description, xp')
+        .order('created_at', ascending: true);
+
+    if (response == null || response.isEmpty) {
+      return [];
+    }
+
+    return List<Map<String, dynamic>>.from(response);
+  } catch (e) {
+    print('Error al obtener todos los logros: $e');
+    rethrow;
+  }
+}
+
+// Obtener los logros completados por el usuario
+Future<List<Map<String, dynamic>>> fetchUserAchievements() async {
+  final userId = getCurrentUserId();
+
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
+  }
+
+  try {
+    final response = await _supabase
+        .from('user_achievements')
+        .select('achievement_id')
+        .eq('user_id', userId);
+
+    if (response == null || response.isEmpty) {
+      return [];
+    }
+
+    return List<Map<String, dynamic>>.from(response);
+  } catch (e) {
+    print('Error al obtener los logros del usuario: $e');
+    rethrow;
+  }
+}
+
+// Registrar un logro como completado
+
+Future<void> completeAchievement(String achievementId) async {
+  final userId = getCurrentUserId();
+
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
+  }
+
+  try {
+    // Verificar si el logro ya está completado
+    final existingAchievement = await _supabase
+        .from('user_achievements')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('achievement_id', achievementId)
+        .maybeSingle();
+
+    if (existingAchievement != null) {
+      print('El logro ya está completado.');
+      return;
+    }
+
+    // Registrar el logro como completado
+    await _supabase.from('user_achievements').insert({
+      'user_id': userId,
+      'achievement_id': achievementId,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
+    // Obtener los puntos de experiencia del logro
+    final achievementData = await _supabase
+        .from('achievements')
+        .select('xp')
+        .eq('id', achievementId)
+        .maybeSingle();
+
+    if (achievementData == null || achievementData['xp'] == null) {
+      throw Exception('No se encontraron datos del logro.');
+    }
+
+    final xp = achievementData['xp'];
+
+    // Actualizar la experiencia del usuario
+    await _supabase
+        .from('users')
+        .update({
+          'experience': xp,
+        })
+        .eq('id', userId);
+  } catch (e) {
+    print('Error al completar el logro: $e');
+    rethrow;
+  }
+}
+
+// Obtener el progreso de logros combinando todos los logros con los completados
+Future<List<Map<String, dynamic>>> fetchAchievementsWithProgress() async {
+  try {
+    // Obtener todos los logros
+    final allAchievements = await fetchAllAchievements();
+
+    // Obtener logros completados
+    final completedAchievements = await fetchUserAchievements();
+    final completedIds = completedAchievements
+        .map((achievement) => achievement['achievement_id'])
+        .toSet();
+
+    // Combinar todos los logros y marcar los completados
+    return allAchievements.map((achievement) {
+      return {
+        'id': achievement['id'],
+        'name': achievement['name'],
+        'description': achievement['description'],
+        'xp': achievement['xp'],
+        'completed': completedIds.contains(achievement['id']),
+      };
+    }).toList();
+  } catch (e) {
+    print('Error al combinar logros con progreso: $e');
+    rethrow;
+  }
+}
+
+//------------------
+
+Future<void> checkBookUploadAchievements() async {
+  final userId = getCurrentUserId();
+
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
+  }
+
+  try {
+    // Contar el número de libros subidos por el usuario
+    final response = await _supabase
+        .from('books')
+        .select('id', const FetchOptions(count: CountOption.exact))
+        .eq('user_id', userId);
+
+    final bookCount = response.count ?? 0;
+
+    // Lista de logros relacionados con subir libros
+    final achievements = {
+      1: 'ffd07138-4020-4ca5-b1ef-fa199042db23', 
+      3: '847f3fe1-29cd-45ee-bbad-3ebcb75d0659',
+      5: '608fc2ee-7c5d-47f7-a7f0-4e7517c95fc6',
+      10: '68dc0a4a-3a3c-4ad3-8e92-a2b20cea0c44',
+
+      15: '34880b80-46a9-4335-97a7-9153a31d949e',
+      20: '44722f83-653e-44ee-9d5b-3eeb740d6f83',
+      25: '4f2cbc99-10c8-49f2-9d7f-fb071493b4ac',
+      30: '804412a2-bb1d-4b88-9b4c-843d3e8c1e12',
+    };
+
+    // Verificar y completar logros basados en el número de libros subidos
+    for (final entry in achievements.entries) {
+      if (bookCount >= entry.key) {
+        await completeAchievement(entry.value);
+      }
+    }
+  } catch (e) {
+    print('Error al verificar logros de libros: $e');
+  }
+}
+
+
+
+
+
+
+
+
+
+//------------------------------------------
+Future<void> checkTradeAchievements() async {
+  final userId = getCurrentUserId();
+
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
+  }
+
+  try {
+    // Contar el número de trueques realizados por el usuario
+    final tradeCountResponse = await _supabase
+        .from('barters')
+        .select('id', const FetchOptions(count: CountOption.exact))
+        .eq('proposer_id', userId)
+        .eq('status', 'completed'); // Solo trueques completados
+
+    final tradeCount = tradeCountResponse.count ?? 0;
+
+    // Verificar los géneros diferentes involucrados en los trueques
+    final genresResponse = await _supabase
+        .from('barters')
+        .select('barter_details(book_id)')
+        .eq('proposer_id', userId)
+        .eq('status', 'completed');
+
+    final bookIds = genresResponse.map((barter) => barter['book_id']).toList();
+
+    // Obtener géneros únicos de los libros involucrados
+    final booksResponse = await _supabase
+        .from('books')
+        .select('genre')
+        .in_('id', bookIds);
+
+    final genres = booksResponse
+        .map((book) => book['genre'])
+        .toSet(); // Usar un set para eliminar duplicados
+
+    // Lista de logros relacionados con trueques
+    final tradeAchievements = {
+      1: '<achievement_id_for_1_trade>',
+      3: '<achievement_id_for_3_trades>',
+      5: '<achievement_id_for_5_trades>',
+      10: '<achievement_id_for_10_trades>',
+    };
+
+    final genreAchievements = {
+      2: '<achievement_id_for_2_genres>',
+      3: '<achievement_id_for_3_genres>',
+      4: '<achievement_id_for_4_genres>',
+    };
+
+    // Verificar logros basados en el número de trueques
+    for (final entry in tradeAchievements.entries) {
+      if (tradeCount >= entry.key) {
+        await completeAchievement(entry.value);
+      }
+    }
+
+    // Verificar logros basados en géneros diferentes
+    for (final entry in genreAchievements.entries) {
+      if (genres.length >= entry.key) {
+        await completeAchievement(entry.value);
+      }
+    }
+  } catch (e) {
+    print('Error al verificar logros de trueques: $e');
+  }
+}
+
+
+
+Future<void> completeTrade(String barterId) async {
+  try {
+    await _supabase
+        .from('barters')
+        .update({
+          'status': 'completed',
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', barterId);
+
+    print('Trueque completado con éxito.');
+
+    // Verificar logros relacionados con trueques
+    await checkTradeAchievements();
+  } catch (e) {
+    print('Error al completar el trueque: $e');
+    throw Exception('Error al completar el trueque.');
+  }
+}
+
+
+
+
+  
 }
 
