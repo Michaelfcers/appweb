@@ -199,7 +199,7 @@ class _ChatItem extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: Colors.black, // Asegura el color negro,
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -207,7 +207,7 @@ class _ChatItem extends StatelessWidget {
                     lastMessage,
                     style: TextStyle(
                       fontSize: 16,
-                      color: AppColors.textSecondary,
+                      color: Colors.black, // Asegura el color negro
                     ),
                   ),
                 ],
@@ -215,7 +215,9 @@ class _ChatItem extends StatelessWidget {
             ),
             Text(
               time,
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black,) // Asegura el color negro
             ),
           ],
         ),

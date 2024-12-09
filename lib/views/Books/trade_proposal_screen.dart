@@ -316,14 +316,16 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
                                           style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
-                                            color: AppColors.textPrimary,
+                                            color: Colors.black, // Establece el color negro para el título
                                           ),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         Text(
-                                          book.author,
-                                          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                                           book.author,
+        style: const TextStyle(
+          fontSize: 14,
+          color: Colors.black, )// Establece el color negro para el autor
                                         ),
                                       ],
                                     ),
