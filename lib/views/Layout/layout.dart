@@ -14,7 +14,7 @@ class Layout extends StatefulWidget {
   final bool showBottomNav;
 
   const Layout({
-    super.key, // Super parámetro
+    super.key,
     required this.body,
     this.currentIndex = 0,
     this.onTabSelected,
@@ -22,7 +22,7 @@ class Layout extends StatefulWidget {
   });
 
   @override
-  LayoutState createState() => LayoutState(); // Clase de estado pública
+  LayoutState createState() => LayoutState();
 }
 
 class LayoutState extends State<Layout> {
@@ -31,41 +31,48 @@ class LayoutState extends State<Layout> {
   @override
   void initState() {
     super.initState();
+    // Inicializamos el índice actual con el índice recibido en el widget
     _currentIndex = widget.currentIndex;
   }
 
-void _onTabTapped(int index) {
-  if (_currentIndex != index) {
-    // Decidimos dinámicamente la pantalla a mostrar
-    Widget nextScreen;
-    switch (index) {
-      case 0:
-        nextScreen = const HomeScreen();
-        break;
-      case 1:
-        nextScreen = const SearchScreen();
-        break;
-      case 2:
-        final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
-        nextScreen = authNotifier.isLoggedIn
-            ? const ProfileScreen()
-            : const ProfileLoggedOutScreen();
-        break;
-      default:
-        nextScreen = const HomeScreen();
-        break;
+  void _onTabTapped(int index) {
+    if (_currentIndex != index) {
+      // Decidimos dinámicamente la pantalla a mostrar
+      Widget nextScreen;
+      switch (index) {
+        case 0:
+          nextScreen = const HomeScreen();
+          break;
+        case 1:
+          nextScreen = const SearchScreen();
+          break;
+        case 2:
+          final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+          nextScreen = authNotifier.isLoggedIn
+              ? const ProfileScreen()
+              : const ProfileLoggedOutScreen();
+          break;
+        default:
+          nextScreen = const HomeScreen();
+          break;
+      }
+
+      // Actualizamos el estado para cambiar el índice y navegamos a la nueva pantalla
+      setState(() {
+        _currentIndex = index;
+      });
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => Layout(
+            body: nextScreen,
+            currentIndex: index,
+          ),
+        ),
+        (route) => false, // Eliminamos todas las rutas anteriores
+      );
     }
-
-    // Evitar apilar múltiples instancias de Layout
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (context) => Layout(body: nextScreen, currentIndex: index),
-      ),
-      (route) => false, // Elimina todas las rutas anteriores
-    );
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
