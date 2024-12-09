@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../styles/colors.dart';
-import '../Layout/layout.dart'; // Importamos el Layout
 import 'chat_screen.dart';
 
 class MessagesScreen extends StatefulWidget {
@@ -58,7 +57,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
       }
 
       for (final entry in groupedChats.entries) {
-        // Ordenamos los mensajes por fecha de creación más reciente
         entry.value['messages']!.sort(
           (a, b) => DateTime.parse(b['created_at'] ?? "")
               .compareTo(DateTime.parse(a['created_at'] ?? "")),
@@ -86,61 +84,60 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Layout(
-      currentIndex: 0, // Indica que estamos en la pestaña de mensajes
-      body: Scaffold(
-        backgroundColor: AppColors.scaffoldBackground,
-        appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          title: Text(
-            "Mensajes",
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+    return Scaffold(
+      backgroundColor: AppColors.scaffoldBackground,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        title: Text(
+          "Mensajes",
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        body: chats.isEmpty
-            ? const Center(
-                child: Text(
-                  "No tienes chats disponibles",
-                  style: TextStyle(fontSize: 16, color: AppColors.grey),
-                ),
-              )
-            : ListView.builder(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                itemCount: chats.length,
-                itemBuilder: (context, index) {
-                  final chat = chats[index];
-                  return FutureBuilder<Map<String, dynamic>>(
-                    future: _fetchUserDetails(chat['user_id']),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final user = snapshot.data!;
-                      final lastMessage = (chat['messages'] as List).isNotEmpty
-                          ? chat['messages'].first['message']
-                          : "Sin mensajes aún";
-                      final lastTime = (chat['messages'] as List).isNotEmpty
-                          ? DateTime.parse(chat['messages'].first['created_at'])
-                          : null;
-
-                      return _ChatItem(
-                        chatTitle: user['nickname'] ?? 'Usuario',
-                        lastMessage: lastMessage,
-                        time: lastTime != null
-                            ? "${lastTime.hour}:${lastTime.minute.toString().padLeft(2, '0')}"
-                            : "N/A",
-                        barterId: chat['barter_ids'].first,
-                      );
-                    },
-                  );
-                },
-              ),
       ),
+      body: chats.isEmpty
+          ? Center(
+              child: Text(
+                "No tienes chats disponibles",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              itemCount: chats.length,
+              itemBuilder: (context, index) {
+                final chat = chats[index];
+                return FutureBuilder<Map<String, dynamic>>(
+                  future: _fetchUserDetails(chat['user_id']),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final user = snapshot.data!;
+                    final lastMessage = (chat['messages'] as List).isNotEmpty
+                        ? chat['messages'].first['message']
+                        : "Sin mensajes aún";
+                    final lastTime = (chat['messages'] as List).isNotEmpty
+                        ? DateTime.parse(chat['messages'].first['created_at'])
+                        : null;
+
+                    return _ChatItem(
+                      chatTitle: user['nickname'] ?? 'Usuario',
+                      lastMessage: lastMessage,
+                      time: lastTime != null
+                          ? "${lastTime.hour}:${lastTime.minute.toString().padLeft(2, '0')}"
+                          : "N/A",
+                      barterId: chat['barter_ids'].first,
+                    );
+                  },
+                );
+              },
+            ),
     );
   }
 }
@@ -194,12 +191,13 @@ class _ChatItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Nickname siempre en negro
                   Text(
                     chatTitle,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black, // Asegura el color negro,
+                      color: Colors.black, // Siempre negro
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -207,7 +205,7 @@ class _ChatItem extends StatelessWidget {
                     lastMessage,
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.black, // Asegura el color negro
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -215,9 +213,10 @@ class _ChatItem extends StatelessWidget {
             ),
             Text(
               time,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Colors.black,) // Asegura el color negro
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),

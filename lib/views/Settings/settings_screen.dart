@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../styles/colors.dart';
 import '../../styles/theme_notifier.dart';
 import '../../auth_notifier.dart';
+import '../Settings/politicas.dart'; // Importa la pantalla de políticas
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -56,7 +57,10 @@ class SettingsScreen extends StatelessWidget {
             icon: Icons.description,
             title: "Políticas de uso",
             onTap: () {
-              // Implementar lógica para ver políticas de uso
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PoliticasScreen()),
+              );
             },
           ),
           const SizedBox(height: 30),
@@ -145,7 +149,8 @@ class SettingsScreen extends StatelessWidget {
                 await authNotifier.logOut();
                 Navigator.of(dialogContext).pop();
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                  // Navegamos a '/homeLoggedOut' que sí está definida en rutas
+                  Navigator.pushNamedAndRemoveUntil(context, '/homeLoggedOut', (route) => false);
                 });
               },
               child: Text(

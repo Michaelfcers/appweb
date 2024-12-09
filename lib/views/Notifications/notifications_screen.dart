@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../styles/colors.dart';
-import '../Layout/layout.dart';
 import 'trade_proposal_dialog.dart';
 import '../../services/user_service.dart';
 
@@ -99,41 +98,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
- Future<void> _openTradeProposalDialog(Map<String, dynamic> notification) async {
-  debugPrint('Intentando abrir el diálogo para la notificación: $notification');
+  Future<void> _openTradeProposalDialog(Map<String, dynamic> notification) async {
+    debugPrint('Intentando abrir el diálogo para la notificación: $notification');
 
-  if (notification['barter_id'] == null) {
-    debugPrint('El barter_id es nulo o no válido.');
-    _showErrorDialog(context, 'No se pudo cargar los detalles del trueque.');
-    return;
+    if (notification['barter_id'] == null) {
+      debugPrint('El barter_id es nulo o no válido.');
+      _showErrorDialog(context, 'No se pudo cargar los detalles del trueque.');
+      return;
+    }
+
+    try {
+      final tradeDetails = await _userService.fetchTradeDetails(notification['id']);
+      debugPrint('Detalles obtenidos: $tradeDetails');
+
+      if (!mounted) return;
+
+      final books = List<Map<String, dynamic>>.from(tradeDetails['books']);
+      final barterStatus = tradeDetails['barter']['status'];
+
+      showDialog(
+        context: context,
+        builder: (context) => TradeProposalDialog(
+          proposerNickname: tradeDetails['proposer']['nickname'],
+          proposerName: tradeDetails['proposer']['name'],
+          barterId: tradeDetails['barter']['id'],
+          books: books,
+          status: barterStatus,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error al abrir el diálogo: $e');
+      _showErrorDialog(context, 'No se pudo abrir la propuesta.');
+    }
   }
-
-  try {
-    final tradeDetails = await _userService.fetchTradeDetails(notification['id']);
-    debugPrint('Detalles obtenidos: $tradeDetails');
-
-    if (!mounted) return;
-
-    // Conversión de books a List<Map<String, dynamic>>
-    final books = List<Map<String, dynamic>>.from(tradeDetails['books']);
-    final barterStatus = tradeDetails['barter']['status']; // Obtenemos el estado
-
-    showDialog(
-      context: context,
-      builder: (context) => TradeProposalDialog(
-        proposerNickname: tradeDetails['proposer']['nickname'],
-        proposerName: tradeDetails['proposer']['name'],
-        barterId: tradeDetails['barter']['id'],
-        books: books, // Pasa la lista convertida
-        status: barterStatus, // Pasamos el estado actual
-      ),
-    );
-  } catch (e) {
-    debugPrint('Error al abrir el diálogo: $e');
-    _showErrorDialog(context, 'No se pudo abrir la propuesta.');
-  }
-}
-
 
   void _showErrorDialog(BuildContext context, String message) {
     showDialog(
@@ -151,19 +148,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
- IconData _getIconForType(String type) {
-  switch (type) {
-    case 'trade_request':
-      return Icons.mail; // Ícono de sobre para representar una notificación
-    case 'trade_accepted':
-      return Icons.thumb_up; // Aceptación más amigable
-    case 'trade_rejected':
-      return Icons.thumb_down; // Rechazo más claro
-    default:
-      return Icons.notifications; // Notificación genérica
+  IconData _getIconForType(String type) {
+    switch (type) {
+      case 'trade_request':
+        return Icons.mail;
+      case 'trade_accepted':
+        return Icons.thumb_up;
+      case 'trade_rejected':
+        return Icons.thumb_down;
+      default:
+        return Icons.notifications;
+    }
   }
-}
-
 
   String _getTitleForType(String type) {
     switch (type) {
@@ -186,51 +182,51 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Layout(
-      currentIndex: 0,
-      body: Scaffold(
-        backgroundColor: AppColors.scaffoldBackground,
-        appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          title: Text(
-            "Notificaciones",
-            style: TextStyle(color: AppColors.textPrimary),
-          ),
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
+    return Scaffold(
+      backgroundColor: AppColors.scaffoldBackground,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        title: Text(
+          "Notificaciones",
+          style: TextStyle(color: AppColors.textPrimary),
         ),
-        body: notifications.isEmpty
-            ? const Center(
-                child: Text(
-                  "No tienes notificaciones",
-                  style: TextStyle(fontSize: 16, color: AppColors.grey),
-                ),
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.all(10),
-                itemCount: notifications.length,
-                itemBuilder: (context, index) {
-                  final notification = notifications[index];
-                  return NotificationCard(
-                    icon: _getIconForType(notification['type']),
-                    title: _getTitleForType(notification['type']),
-                    subtitle: notification['content'] ?? '',
-                    isRead: notification['read'],
-                    onTap: () {
-                      debugPrint('Notificación seleccionada: $notification');
-                      if (!notification['read']) {
-                        _markAsRead(notification['id']);
-                      }
-                      if (notification['type'] == 'trade_request') {
-                        _openTradeProposalDialog(notification);
-                      }
-                    },
-                  );
-                },
-              ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
+      body: notifications.isEmpty
+          ? Center(
+              child: Text(
+                "No tienes notificaciones",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(10),
+              itemCount: notifications.length,
+              itemBuilder: (context, index) {
+                final notification = notifications[index];
+                return NotificationCard(
+                  icon: _getIconForType(notification['type']),
+                  title: _getTitleForType(notification['type']),
+                  subtitle: notification['content'] ?? '',
+                  isRead: notification['read'],
+                  onTap: () {
+                    debugPrint('Notificación seleccionada: $notification');
+                    if (!notification['read']) {
+                      _markAsRead(notification['id']);
+                    }
+                    if (notification['type'] == 'trade_request') {
+                      _openTradeProposalDialog(notification);
+                    }
+                  },
+                );
+              },
+            ),
     );
   }
 }
@@ -253,39 +249,43 @@ class NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: isRead
-          ? AppColors.notificationReadBackground
-          : AppColors.notificationUnreadBackground,
+    // Si la notificación está leída, usamos line-through y un color más apagado.
+    final titleStyle = TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.bold,
+      color: isRead ? Colors.black54 : Colors.black,
+      decoration: isRead ? TextDecoration.lineThrough : null,
+    );
+
+    return Container(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isRead ? AppColors.textSecondary : AppColors.primary,
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+        border: Border.all(
+          color: isRead ? AppColors.divider : AppColors.primary,
           width: 1.5,
         ),
       ),
-      elevation: isRead ? 1 : 4,
       child: ListTile(
         leading: Icon(
           icon,
           color: isRead ? AppColors.textSecondary : AppColors.iconSelected,
           size: 30,
         ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: isRead ? AppColors.notificationReadText : AppColors.notificationUnreadText,
-            decoration: isRead ? TextDecoration.lineThrough : null,
-          ),
-        ),
+        title: Text(title, style: titleStyle),
         subtitle: Text(
           subtitle,
           style: TextStyle(
             fontSize: 14,
-            color: isRead ? AppColors.notificationReadText : AppColors.notificationUnreadText,
+            color: AppColors.textSecondary,
           ),
         ),
         onTap: onTap,

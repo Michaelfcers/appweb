@@ -11,7 +11,6 @@ import 'views/Profile/profile_logged_out_screen.dart';
 import 'views/Layout/layout.dart';
 import 'views/Home/start_page.dart';
 import 'views/Home/home_screen_logged_out.dart';
-import 'views/Login/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +39,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeNotifier = Provider.of<ThemeNotifier>(context);
+    final authNotifier = Provider.of<AuthNotifier>(context);
 
     return MaterialApp(
       title: 'BookSwap',
@@ -47,16 +47,23 @@ class MyApp extends StatelessWidget {
       theme: AppColors.getThemeData(false), // Tema claro
       darkTheme: AppColors.getThemeData(true), // Tema oscuro
       themeMode: themeNotifier.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      initialRoute: '/start', // Ruta inicial
+      home: _getInitialScreen(authNotifier),
       routes: {
-        '/start': (context) => const StartPage(), // Pantalla inicial
-         '/home': (context) => const HomeScreen(),
-        '/homeLoggedOut': (context) => const HomeScreenLoggedOut(), // Clase HomeScreenLoggedOut
-        '/search': (context) => const LayoutWrapper(index: 1), // Pantalla Buscar
-        '/profile': (context) => const LayoutWrapper(index: 2), // Pantalla Perfil
-         '/login': (context) => const LoginScreen(), // Añade esta línea
+        '/home': (context) => const LayoutWrapper(index: 0),
+        '/homeLoggedOut': (context) => const HomeScreenLoggedOut(),
+        '/search': (context) => const LayoutWrapper(index: 1),
+        '/profile': (context) => const LayoutWrapper(index: 2),
       },
     );
+  }
+
+  Widget _getInitialScreen(AuthNotifier authNotifier) {
+    if (authNotifier.isLoggedIn) {
+      // Ahora cargamos el Layout con el HomeScreen desde el inicio.
+      return const LayoutWrapper(index: 0); 
+    } else {
+      return const StartPage(); 
+    }
   }
 }
 
@@ -73,15 +80,14 @@ class LayoutWrapper extends StatelessWidget {
       const HomeScreen(),
       const SearchScreen(),
       authNotifier.isLoggedIn
-          ? const ProfileScreen() // Perfil cuando está logueado
-          : const ProfileLoggedOutScreen(), // Perfil cuando no está logueado
+          ? const ProfileScreen() 
+          : const ProfileLoggedOutScreen(),
     ];
 
     return Layout(
       body: screens[index],
       currentIndex: index,
       onTabSelected: (selectedIndex) {
-        // Navegación dinámica según la tab seleccionada
         String route;
         switch (selectedIndex) {
           case 0:

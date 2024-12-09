@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../styles/colors.dart';
 import '../../auth_notifier.dart';
 import 'signup_screen.dart';
-import 'recovery_password_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -88,22 +87,6 @@ class LoginScreen extends StatelessWidget {
                 ),
               ),
               style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
-            ),
-            const SizedBox(height: 20),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const RecoveryPasswordScreen()),
-                  );
-                },
-                child: Text(
-                  "¿Olvidó su contraseña? Haz clic aquí",
-                  style: TextStyle(color: AppColors.iconSelected, fontSize: 16),
-                ),
-              ),
             ),
             const SizedBox(height: 20),
             Consumer<AuthNotifier>(

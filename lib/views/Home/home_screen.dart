@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:carousel_slider/carousel_slider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../models/book_model.dart';
@@ -21,9 +20,7 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   final UserService userService = UserService();
-  List<Book> featuredBooks = [];
-  List<Book> recommendedBooks = [];
-  List<Book> popularBooks = [];
+  List<Book> allBooks = [];
   bool isLoading = true;
 
   @override
@@ -35,17 +32,14 @@ class HomeScreenState extends State<HomeScreen> {
   Future<void> fetchBooks() async {
     try {
       final books = await userService.getBooksFromOtherUsers();
-
       if (!mounted) return;
-
       setState(() {
-        featuredBooks = books.take(5).toList();
+        allBooks = books;
         isLoading = false;
       });
     } catch (error) {
       debugPrint('Error al cargar libros: $error');
       if (!mounted) return;
-
       setState(() {
         isLoading = false;
       });
@@ -71,7 +65,7 @@ class HomeScreenState extends State<HomeScreen> {
         title: Text(
           "BookSwap",
           style: GoogleFonts.poppins(
-            color: AppColors.tittle,
+            color: AppColors.textPrimary,
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
@@ -101,30 +95,121 @@ class HomeScreenState extends State<HomeScreen> {
       body: Container(
         color: AppColors.scaffoldBackground,
         child: isLoading
-            ? _buildSkeletonLoader()
+            ? _buildSkeletonGrid()
             : RefreshIndicator(
                 color: AppColors.primary,
                 onRefresh: fetchBooks,
                 child: ListView(
                   padding: const EdgeInsets.all(16.0),
                   children: [
-                    _buildSectionTitle("Libros Destacados"),
-                    const SizedBox(height: 10),
-                    _buildCarousel(featuredBooks, "featured"),
+                    Text(
+                      "¡Empieza a explorar nuevos libros y haz trueques!",
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     const SizedBox(height: 20),
-                    _buildSectionTitle("Recomendados para Ti"),
-                    const SizedBox(height: 10),
-                    _buildCarousel(recommendedBooks, "recommended"),
-                    const SizedBox(height: 20),
-                    _buildSectionTitle("Libros Populares"),
-                    const SizedBox(height: 10),
-                    _buildCarousel(popularBooks, "popular"),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2, 
+                        crossAxisSpacing: 16.0,
+                        mainAxisSpacing: 16.0,
+                        childAspectRatio: 0.7,
+                      ),
+                      itemCount: allBooks.length,
+                      itemBuilder: (context, index) {
+                        final book = allBooks[index];
+                        final heroTag = 'book-${book.id ?? book.title}-$index';
+
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => BookDetailsScreen(
+                                  book: book,
+                                  heroTag: heroTag,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(15),
+                              color: AppColors.cardBackground,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.shadow,
+                                  spreadRadius: 2,
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Hero(
+                                    tag: heroTag,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: const BorderRadius.only(
+                                          topLeft: Radius.circular(15),
+                                          topRight: Radius.circular(15),
+                                        ),
+                                        image: DecorationImage(
+                                          image: NetworkImage(book.thumbnail),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        book.title,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.cardTitleColor, // Texto siempre oscuro
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        book.author,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          color: AppColors.cardAuthorColor, // Autor también oscuro
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
       ),
       floatingActionButton: FloatingActionButton(
-  backgroundColor: AppColors.iconSelected, // Cambia el fondo al color que usas en modo claro
+        backgroundColor: AppColors.iconSelected,
         onPressed: () {
           showDialog(
             context: context,
@@ -136,171 +221,47 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.poppins(
-        fontSize: 22,
-        fontWeight: FontWeight.bold,
-        color: AppColors.textPrimary,
-      ),
-    );
-  }
-
-  Widget _buildCarousel(List<Book> books, String sectionName) {
-    if (books.isEmpty) {
-      return Container(
-        height: 280,
-        alignment: Alignment.center,
-        child: Text(
-          "Sin contenido disponible",
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      );
-    }
-
-    return CarouselSlider(
-      options: CarouselOptions(
-        height: 280,
-        enlargeCenterPage: true,
-        viewportFraction: 0.6,
-        autoPlay: true,
-        autoPlayInterval: const Duration(seconds: 5),
-        autoPlayAnimationDuration: const Duration(milliseconds: 800),
-        autoPlayCurve: Curves.fastOutSlowIn,
-      ),
-      items: books.asMap().entries.map((entry) {
-        final index = entry.key;
-        final book = entry.value;
-        final heroTag = '$sectionName-${book.id ?? book.title}-$index';
-
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => BookDetailsScreen(
-                  book: book,
-                  heroTag: heroTag,
-                ),
-              ),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              color: AppColors.cardBackground,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.shadow,
-                  spreadRadius: 2,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Hero(
-                    tag: heroTag,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(15),
-                          topRight: Radius.circular(15),
-                        ),
-                        image: DecorationImage(
-                          image: NetworkImage(book.thumbnail),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        book.title,
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-    color: Colors.black, // Fuerza el color negro
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        book.author,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildSkeletonLoader() {
-    return ListView(
+  Widget _buildSkeletonGrid() {
+    return Padding(
       padding: const EdgeInsets.all(16.0),
-      children: [
-        _buildSectionTitle('Libros Destacados'),
-        const SizedBox(height: 10),
-        _buildSkeletonCarousel(),
-        const SizedBox(height: 20),
-        _buildSectionTitle('Recomendados para Ti'),
-        const SizedBox(height: 10),
-        _buildSkeletonCarousel(),
-        const SizedBox(height: 20),
-        _buildSectionTitle('Libros Populares'),
-        const SizedBox(height: 10),
-        _buildSkeletonCarousel(),
-      ],
-    );
-  }
-
-  Widget _buildSkeletonCarousel() {
-    return CarouselSlider(
-      options: CarouselOptions(
-        height: 280,
-        enlargeCenterPage: true,
-        viewportFraction: 0.6,
-        autoPlay: false,
-      ),
-      items: List.generate(5, (index) {
-        return Shimmer.fromColors(
-          baseColor: AppColors.shadow,
-          highlightColor: AppColors.cardBackground,
-          period: const Duration(seconds: 1),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              color: AppColors.cardBackground,
+      child: ListView(
+        children: [
+          Text(
+            "¡Empieza a explorar nuevos libros y haz trueques!",
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
             ),
           ),
-        );
-      }),
+          const SizedBox(height: 20),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            key: const Key('skeleton_grid'),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2, 
+              crossAxisSpacing: 16.0,
+              mainAxisSpacing: 16.0,
+              childAspectRatio: 0.7,
+            ),
+            itemCount: 6,
+            itemBuilder: (context, index) {
+              return Shimmer.fromColors(
+                baseColor: AppColors.shadow.withOpacity(0.3),
+                highlightColor: AppColors.cardBackground,
+                period: const Duration(milliseconds: 800),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
+                    color: AppColors.cardBackground,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }

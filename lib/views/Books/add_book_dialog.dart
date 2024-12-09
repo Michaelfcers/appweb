@@ -64,42 +64,39 @@ class _AddBookDialogState extends State<AddBookDialog> {
     }
   }
 
-Future<void> _addBookToUser() async {
-  try {
-    if (_titleController.text.trim().isEmpty ||
-        _conditionController.text.trim().isEmpty ||
-        _thumbnailUrl == null) {
-      throw Exception('Por favor, completa todos los campos obligatorios');
+  Future<void> _addBookToUser() async {
+    try {
+      if (_titleController.text.trim().isEmpty ||
+          _conditionController.text.trim().isEmpty ||
+          _thumbnailUrl == null) {
+        throw Exception('Por favor, completa todos los campos obligatorios');
+      }
+
+      await _userService.addBookToUser(
+        title: _titleController.text.trim(),
+        author: _authorController.text.trim(),
+        genre: _genreController.text.trim(),
+        description: _descriptionController.text.trim(),
+        condition: _conditionController.text.trim(),
+        photos: _uploadedPhotos.map((photo) => photo.path).toList(),
+        thumbnail: _thumbnailUrl!,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Libro agregado con éxito')),
+      );
+
+      Navigator.pop(context, true); 
+    } catch (e) {
+      if (!mounted) return;
+      print("Error al agregar libro: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al agregar el libro: $e')),
+      );
     }
-
-    await _userService.addBookToUser(
-      title: _titleController.text.trim(),
-      author: _authorController.text.trim(),
-      genre: _genreController.text.trim(),
-      description: _descriptionController.text.trim(),
-      condition: _conditionController.text.trim(),
-      photos: _uploadedPhotos.map((photo) => photo.path).toList(),
-      thumbnail: _thumbnailUrl!,
-    );
-
-    if (!mounted) return;
-
-    // Mostrar un mensaje de éxito
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Libro agregado con éxito')),
-    );
-
-    // Cierra el diálogo e informa al ProfileScreen que debe actualizar la lista
-    Navigator.pop(context, true); // Retorna "true" al perfil para actualizar
-  } catch (e) {
-    if (!mounted) return;
-    print("Error al agregar libro: $e");
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error al agregar el libro: $e')),
-    );
   }
-}
-
 
   Future<void> _pickImages() async {
     final ImagePicker picker = ImagePicker();
@@ -162,11 +159,15 @@ Future<void> _addBookToUser() async {
         borderRadius: BorderRadius.circular(8),
       ),
       child: _thumbnailUrl != null
-          ? Image.network(_thumbnailUrl!, fit: BoxFit.cover)
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(_thumbnailUrl!, fit: BoxFit.cover),
+            )
           : Center(
-              child: Text(
-                '160 x 220',
-                style: TextStyle(color: AppColors.textPrimary),
+              child: Icon(
+                Icons.book,
+                size: 50,
+                color: AppColors.textPrimary.withOpacity(0.7),
               ),
             ),
     );
@@ -184,11 +185,14 @@ Future<void> _addBookToUser() async {
           spacing: 8.0,
           runSpacing: 4.0,
           children: _uploadedPhotos
-              .map((photo) => Image.file(
-                    photo,
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.cover,
+              .map((photo) => ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      photo,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                    ),
                   ))
               .toList(),
         ),
@@ -246,7 +250,7 @@ Future<void> _addBookToUser() async {
               borderSide: BorderSide(color: AppColors.iconSelected),
             ),
           ),
-    style: const TextStyle(color: Colors.black), // Texto mostrado en negro
+          style: const TextStyle(color: Colors.black),
         );
       },
     );
@@ -266,7 +270,7 @@ Future<void> _addBookToUser() async {
           borderSide: BorderSide(color: AppColors.iconSelected),
         ),
       ),
-    style: const TextStyle(color: Colors.black), // Texto mostrado en negro
+      style: const TextStyle(color: Colors.black),
     );
   }
 
@@ -283,7 +287,7 @@ Future<void> _addBookToUser() async {
           borderSide: BorderSide(color: AppColors.iconSelected),
         ),
       ),
-    style: const TextStyle(color: Colors.black), // Texto escrito en negro
+      style: const TextStyle(color: Colors.black),
     );
   }
 }
