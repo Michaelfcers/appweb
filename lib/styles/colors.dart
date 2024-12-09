@@ -39,6 +39,15 @@ class AppColors {
   static Color get dialogTitleText => _isDarkMode ? white : black; // Títulos del diálogo
   static Color get dialogBodyText => _isDarkMode ? white : Colors.black87; // Texto del contenido del diálogo
 
+  static Color get dialogPrimaryButton =>
+    _isDarkMode ? const Color(0xFFD32F2F) : const Color(0xFFB71C1C); // Botón principal rojo oscuro
+static Color get dialogPrimaryButtonText =>
+    const Color(0xFFFFFFFF); // Texto blanco para el botón
+static Color get dialogSecondaryButton =>
+    _isDarkMode ? const Color(0xFF9E9E9E) : const Color(0xFF757575); // Botón secundario gris
+static Color get dialogSecondaryButtonText =>
+    _isDarkMode ? const Color(0xFFDDDDDD) : const Color(0xFF4A4A4A); // Texto secundario gris oscuro
+
   
   // Colores específicos para notificaciones
   static Color get notificationReadBackground =>

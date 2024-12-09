@@ -60,42 +60,35 @@ class _HomeScreenLoggedOutState extends State<HomeScreenLoggedOut> {
     return Layout(
       body: Scaffold(
         backgroundColor: AppColors.scaffoldBackground,
-        appBar: AppBar(
-          elevation: 0,
-          backgroundColor: AppColors.primary,
-          title: Text(
-            "BookSwap",
-            style: GoogleFonts.poppins(
-              color: AppColors.tittle,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.message, color: AppColors.textPrimary),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const MessagesScreen(),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              icon: Icon(Icons.notifications, color: AppColors.textPrimary),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const NotificationsScreen(),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+       appBar: AppBar(
+  elevation: 0,
+  backgroundColor: AppColors.primary,
+  title: Text(
+    "BookSwap",
+    style: GoogleFonts.poppins(
+      color: AppColors.tittle,
+      fontSize: 24,
+      fontWeight: FontWeight.bold,
+    ),
+  ),
+  actions: [
+    IconButton(
+      icon: Icon(Icons.message, color: AppColors.textPrimary),
+      onPressed: () {
+        // Mostrar cuadro de diálogo en lugar de navegar
+        _showLoginPrompt(context);
+      },
+    ),
+    IconButton(
+      icon: Icon(Icons.notifications, color: AppColors.textPrimary),
+      onPressed: () {
+        // Mostrar cuadro de diálogo en lugar de navegar
+        _showLoginPrompt(context);
+      },
+    ),
+  ],
+),
+
         body: Container(
           color: AppColors.scaffoldBackground,
           child: isLoading
@@ -135,82 +128,83 @@ class _HomeScreenLoggedOutState extends State<HomeScreenLoggedOut> {
   }
 
   void _showLoginPrompt(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          backgroundColor: AppColors.scaffoldBackground,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "Inicia Sesión",
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+  showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        backgroundColor: AppColors.dialogBackground,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Inicia Sesión",
+                style: TextStyle(
+                  color: AppColors.dialogTitleText,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  "Debes iniciar sesión para acceder a esta funcionalidad.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 16,
-                  ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Debes iniciar sesión para acceder a esta funcionalidad.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.dialogBodyText,
+                  fontSize: 16,
                 ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        "Cancelar",
-                        style: TextStyle(
-                          color: AppColors.iconUnselected,
-                          fontWeight: FontWeight.w500,
-                        ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      "Cancelar",
+                      style: TextStyle(
+                        color: AppColors.dialogSecondaryButtonText,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.pushNamed(context, '/login');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.iconSelected,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, '/login');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.dialogPrimaryButton,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
                       ),
-                      child: Text(
-                        "Iniciar Sesión",
-                        style: TextStyle(
-                          color: AppColors.cardBackground,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                    child: Text(
+                      "Iniciar Sesión",
+                      style: TextStyle(
+                        color: AppColors.dialogPrimaryButtonText,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
+
 
   Widget _buildSectionTitle(String title) {
     return Text(
@@ -297,7 +291,7 @@ class _HomeScreenLoggedOutState extends State<HomeScreenLoggedOut> {
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: Colors.black, // Cambiado a negro explícitamente
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

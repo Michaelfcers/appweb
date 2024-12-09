@@ -368,7 +368,7 @@ class ProfileScreenState extends State<ProfileScreen> {
             title: Text(
               achievement['name'],
               style: TextStyle(
-                color: AppColors.textPrimary,
+      color: Colors.black, // Nombres de logros en negro
               ),
             ),
             subtitle: Text(

@@ -246,7 +246,7 @@ Future<void> _addBookToUser() async {
               borderSide: BorderSide(color: AppColors.iconSelected),
             ),
           ),
-          style: TextStyle(color: AppColors.textPrimary),
+    style: const TextStyle(color: Colors.black), // Texto mostrado en negro
         );
       },
     );
@@ -266,7 +266,7 @@ Future<void> _addBookToUser() async {
           borderSide: BorderSide(color: AppColors.iconSelected),
         ),
       ),
-      style: TextStyle(color: AppColors.textPrimary),
+    style: const TextStyle(color: Colors.black), // Texto mostrado en negro
     );
   }
 
@@ -283,7 +283,7 @@ Future<void> _addBookToUser() async {
           borderSide: BorderSide(color: AppColors.iconSelected),
         ),
       ),
-      style: TextStyle(color: AppColors.textPrimary),
+    style: const TextStyle(color: Colors.black), // Texto escrito en negro
     );
   }
 }
