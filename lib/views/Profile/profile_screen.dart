@@ -217,101 +217,134 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildBooksGrid() {
-    return uploadedBooks.isEmpty
-        ? Center(
-            child: Text(
-              'No has subido libros aún.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
-            ),
-          )
-        : Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 8.0,
-                crossAxisSpacing: 8.0,
-                childAspectRatio: 1.0,
-              ),
-              itemCount: uploadedBooks.length,
-              itemBuilder: (context, index) {
-                final book = uploadedBooks[index];
-                return GestureDetector(
-                  onTap: () async {
-                    final shouldUpdate = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BookDetailsScreen(
-                          book: book,
-                          onDelete: (deletedBookId) {
-                            setState(() {
-                              uploadedBooks
-                                  .removeWhere((b) => b.id == deletedBookId);
-                            });
-                          },
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 8.0,
+          crossAxisSpacing: 8.0,
+          childAspectRatio: 1.0,
+        ),
+        itemCount: uploadedBooks.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return GestureDetector(
+              onTap: () async {
+                final shouldUpdate = await showDialog<bool>(
+                  context: context,
+                  builder: (BuildContext context) => const AddBookDialog(),
+                );
+
+                if (shouldUpdate == true) {
+                  await fetchUploadedBooks();
+                }
+              },
+              child: Card(
+                color: AppColors.cardBackground,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 3,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add,
+                          color: AppColors.iconSelected, size: 36),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Agregar libro',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.iconSelected,
                         ),
                       ),
-                    );
-
-                    if (shouldUpdate == true) {
-                      await fetchUploadedBooks();
-                    }
-                  },
-                  child: Card(
-                    color: AppColors.cardBackground,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          height: 100,
-                          decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(10),
-                              topRight: Radius.circular(10),
-                            ),
-                            image: DecorationImage(
-                              image: NetworkImage(book.thumbnail),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(
-                            book.title,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Text(
-                            book.author,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          } else {
+            final book = uploadedBooks[index - 1];
+            return GestureDetector(
+              onTap: () async {
+                final shouldUpdate = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => BookDetailsScreen(
+                      book: book,
+                      onDelete: (deletedBookId) {
+                        setState(() {
+                          uploadedBooks
+                              .removeWhere((b) => b.id == deletedBookId);
+                        });
+                      },
                     ),
                   ),
                 );
+
+                if (shouldUpdate == true) {
+                  await fetchUploadedBooks();
+                }
               },
-            ),
-          );
+              child: Card(
+                color: AppColors.cardBackground,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 100,
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(10),
+                          topRight: Radius.circular(10),
+                        ),
+                        image: DecorationImage(
+                          image: NetworkImage(book.thumbnail),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        book.title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text(
+                        book.author,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            );
+          }
+        },
+      ),
+    );
   }
 
   Widget _buildAchievementsList() {
