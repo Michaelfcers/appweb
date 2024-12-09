@@ -47,37 +47,16 @@ class MyApp extends StatelessWidget {
       theme: AppColors.getThemeData(false), // Tema claro
       darkTheme: AppColors.getThemeData(true), // Tema oscuro
       themeMode: themeNotifier.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: const AuthWrapper(), // Usar el AuthWrapper como pantalla inicial
+      initialRoute: '/start', // Ruta inicial
       routes: {
-        '/start': (context) => const StartPage(),
-        '/home': (context) => const HomeScreen(),
-        '/homeLoggedOut': (context) => const HomeScreenLoggedOut(),
-        '/search': (context) => const LayoutWrapper(index: 1),
-        '/profile': (context) => const LayoutWrapper(index: 2),
-        '/login': (context) => const LoginScreen(),
+        '/start': (context) => const StartPage(), // Pantalla inicial
+         '/home': (context) => const HomeScreen(),
+        '/homeLoggedOut': (context) => const HomeScreenLoggedOut(), // Clase HomeScreenLoggedOut
+        '/search': (context) => const LayoutWrapper(index: 1), // Pantalla Buscar
+        '/profile': (context) => const LayoutWrapper(index: 2), // Pantalla Perfil
+         '/login': (context) => const LoginScreen(), // Añade esta línea
       },
     );
-  }
-}
-
-// AuthWrapper para manejar la lógica de inicio de sesión y navegación
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final authNotifier = Provider.of<AuthNotifier>(context);
-
-    if (authNotifier.isLoggedIn) {
-      // Si el usuario está autenticado, redirigir al HomeScreen dentro del Layout
-      return const Layout(
-        body: HomeScreen(),
-        currentIndex: 0,
-      );
-    } else {
-      // Si no está autenticado, redirigir a la pantalla de inicio de sesión
-      return const LoginScreen();
-    }
   }
 }
 
@@ -94,8 +73,8 @@ class LayoutWrapper extends StatelessWidget {
       const HomeScreen(),
       const SearchScreen(),
       authNotifier.isLoggedIn
-          ? const ProfileScreen()
-          : const ProfileLoggedOutScreen(),
+          ? const ProfileScreen() // Perfil cuando está logueado
+          : const ProfileLoggedOutScreen(), // Perfil cuando no está logueado
     ];
 
     return Layout(

@@ -11,7 +11,6 @@ import '../Messages/messages_screen.dart';
 import '../Books/book_details_screen.dart';
 import '../../styles/colors.dart';
 import '../../auth_notifier.dart';
-import '../Layout/layout.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -59,15 +58,7 @@ class HomeScreenState extends State<HomeScreen> {
 
     if (!authNotifier.isLoggedIn) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => Layout(
-              body: const HomeScreen(),
-              currentIndex: 0,
-            ),
-          ),
-          (route) => false,
-        );
+        Navigator.pushReplacementNamed(context, '/homeLoggedOut');
       });
       return Container();
     }
@@ -242,7 +233,7 @@ class HomeScreenState extends State<HomeScreen> {
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black, // Fuerza el color negro
+                          color: AppColors.textPrimary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -308,7 +299,7 @@ class HomeScreenState extends State<HomeScreen> {
             ),
           ),
         );
-      }).toList(),
+      }),
     );
   }
 }
