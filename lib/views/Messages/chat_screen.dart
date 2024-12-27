@@ -38,7 +38,6 @@ class _ChatScreenState extends State<ChatScreen> {
         messages = List<Map<String, dynamic>>.from(response);
       });
 
-      // Desplázate al último mensaje después de cargar los mensajes
       _scrollToBottom();
     } catch (e) {
       debugPrint('Error al obtener mensajes: $e');
@@ -60,30 +59,37 @@ class _ChatScreenState extends State<ChatScreen> {
         debugPrint('Nuevo mensaje recibido: $payload');
         final newMessage = payload['new'] as Map<String, dynamic>;
 
-        if (newMessage['barter_id'] == widget.barterId) {
+        // Verifica si el mensaje ya está en la lista para evitar duplicados
+        final messageExists = messages.any((message) => message['id'] == newMessage['id']);
+
+        if (!messageExists) {
           setState(() {
             messages.add(newMessage);
             messages.sort((a, b) => DateTime.parse(a['created_at'])
                 .compareTo(DateTime.parse(b['created_at'])));
           });
-
-          // Desplázate al último mensaje cuando llegue uno nuevo
           _scrollToBottom();
         }
       },
     );
 
-    _realtimeChannel.subscribe();
+    try {
+      _realtimeChannel.subscribe();
+    } catch (error) {
+      debugPrint('Error al suscribirse al canal: $error');
+    }
   }
 
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _sendMessage() async {
@@ -93,22 +99,22 @@ class _ChatScreenState extends State<ChatScreen> {
     final newMessage = {
       'barter_id': widget.barterId,
       'sender_id': _supabase.auth.currentUser!.id,
-      'receiver_id': null, // Ajusta esto según el caso
+      'receiver_id': null,
       'message': messageText,
       'created_at': DateTime.now().toIso8601String(),
     };
 
-    setState(() {
-      messages.add(newMessage);
-      _messageController.clear();
-    });
-
     try {
-      await _supabase.from('messages').insert(newMessage);
+      await _supabase
+          .from('messages')
+          .insert(newMessage)
+          .select()
+          .single(); // Selecciona el mensaje insertado.
     } catch (e) {
       debugPrint('Error al enviar mensaje: $e');
+    } finally {
       setState(() {
-        messages.remove(newMessage);
+        _messageController.clear();
       });
     }
   }
@@ -167,20 +173,19 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Expanded(
                   child: TextField(
-  controller: _messageController,
-  style: const TextStyle(color: Colors.black), // Asegura que el texto sea negro
-  decoration: InputDecoration(
-    hintText: "Escribe un mensaje...",
-    hintStyle: TextStyle(color: AppColors.textSecondary),
-    filled: true,
-    fillColor: AppColors.cardBackground,
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(25),
-      borderSide: BorderSide.none,
-    ),
-  ),
-),
-
+                    controller: _messageController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: InputDecoration(
+                      hintText: "Escribe un mensaje...",
+                      hintStyle: TextStyle(color: AppColors.textSecondary),
+                      filled: true,
+                      fillColor: AppColors.cardBackground,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
                 ),
                 IconButton(
                   icon: Icon(Icons.send, color: AppColors.iconSelected),
