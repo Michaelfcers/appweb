@@ -39,7 +39,6 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeNotifier = Provider.of<ThemeNotifier>(context);
-    final authNotifier = Provider.of<AuthNotifier>(context);
 
     return MaterialApp(
       title: 'BookSwap',
@@ -47,23 +46,15 @@ class MyApp extends StatelessWidget {
       theme: AppColors.getThemeData(false), // Tema claro
       darkTheme: AppColors.getThemeData(true), // Tema oscuro
       themeMode: themeNotifier.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: _getInitialScreen(authNotifier),
+      initialRoute: '/start', // Fijar una ruta inicial predecible
       routes: {
+        '/start': (context) => const StartPage(),
         '/home': (context) => const LayoutWrapper(index: 0),
         '/homeLoggedOut': (context) => const HomeScreenLoggedOut(),
         '/search': (context) => const LayoutWrapper(index: 1),
         '/profile': (context) => const LayoutWrapper(index: 2),
       },
     );
-  }
-
-  Widget _getInitialScreen(AuthNotifier authNotifier) {
-    if (authNotifier.isLoggedIn) {
-      // Ahora cargamos el Layout con el HomeScreen desde el inicio.
-      return const LayoutWrapper(index: 0); 
-    } else {
-      return const StartPage(); 
-    }
   }
 }
 

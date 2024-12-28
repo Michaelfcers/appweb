@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../models/book_model.dart';
-import 'trade_proposal_screen.dart';
+import '../../services/user_service.dart';
+import '../Profile/user_profile_screen.dart';
 import '../../styles/colors.dart';
+import '../Books/trade_proposal_screen.dart';
 
 class BookDetailsScreen extends StatefulWidget {
   final Book book;
-  final String heroTag; // Agregado para soporte de Hero
+  final String heroTag;
 
   const BookDetailsScreen({super.key, required this.book, required this.heroTag});
 
@@ -14,7 +16,32 @@ class BookDetailsScreen extends StatefulWidget {
 }
 
 class _BookDetailsScreenState extends State<BookDetailsScreen> {
+  String? userNickname;
+  bool isNicknameLoading = true;
   bool isExpanded = false;
+  final UserService userService = UserService();
+
+  @override
+  void initState() {
+    super.initState();
+    fetchUserNickname(widget.book.id);
+  }
+
+  Future<void> fetchUserNickname(String bookId) async {
+    try {
+      final userDetails = await userService.getUserDetailsByBookId(bookId);
+
+      setState(() {
+        userNickname = userDetails['nickname'] ?? "Usuario desconocido";
+        isNicknameLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        userNickname = "Usuario desconocido";
+        isNicknameLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,9 +65,61 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Usuario que subió el libro (ahora arriba de la imagen)
+            GestureDetector(
+              onTap: widget.book.userId == null
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              UserProfileScreen(userId: widget.book.userId!),
+                        ),
+                      );
+                    },
+              child: Card(
+                color: AppColors.cardBackground,
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: AppColors.shadow,
+                        child: Text(
+                          userNickname?.substring(0, 1).toUpperCase() ?? "?",
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        isNicknameLoading
+                            ? 'Cargando...'
+                            : "Subido por: $userNickname",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.iconSelected,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
             // Imagen del libro con Hero
             Hero(
-              tag: widget.heroTag, // Usamos el heroTag para la animación
+              tag: widget.heroTag,
               child: Container(
                 width: 160,
                 height: 220,
@@ -60,7 +139,7 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Título y detalles del autor y género
+            // Título del libro
             Text(
               book.title,
               style: TextStyle(
@@ -102,36 +181,7 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Calificación
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  "Calificación:",
-                  style: TextStyle(fontSize: 18, color: AppColors.textPrimary),
-                ),
-                const SizedBox(width: 8),
-                Row(
-                  children: List.generate(5, (index) {
-                    return Icon(
-                      Icons.star,
-                      size: 24,
-                      color: index < (book.rating ?? 4)
-                          ? Colors.amber
-                          : AppColors.shadow,
-                    );
-                  }),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  "${book.rating ?? 4.5}/5",
-                  style: TextStyle(fontSize: 18, color: AppColors.textPrimary),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Sinopsis con opción de ver más
+            // Sinopsis
             Text(
               "Sinopsis",
               style: TextStyle(
@@ -177,8 +227,8 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.iconSelected,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 32, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
@@ -200,7 +250,6 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
           ],
         ),
       ),

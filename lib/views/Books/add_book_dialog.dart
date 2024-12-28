@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../Books/add_book_manual_screen.dart';
 import '../../models/book_model.dart';
 import '../../services/google_books_service.dart';
-import '../../services/user_service.dart';
 import '../../styles/colors.dart';
 
 class AddBookDialog extends StatefulWidget {
@@ -15,7 +15,7 @@ class AddBookDialog extends StatefulWidget {
 
 class _AddBookDialogState extends State<AddBookDialog> {
   final GoogleBooksService _googleBooksService = GoogleBooksService();
-  final UserService _userService = UserService();
+  
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _authorController = TextEditingController();
@@ -64,40 +64,6 @@ class _AddBookDialogState extends State<AddBookDialog> {
     }
   }
 
-  Future<void> _addBookToUser() async {
-    try {
-      if (_titleController.text.trim().isEmpty ||
-          _conditionController.text.trim().isEmpty ||
-          _thumbnailUrl == null) {
-        throw Exception('Por favor, completa todos los campos obligatorios');
-      }
-
-      await _userService.addBookToUser(
-        title: _titleController.text.trim(),
-        author: _authorController.text.trim(),
-        genre: _genreController.text.trim(),
-        description: _descriptionController.text.trim(),
-        condition: _conditionController.text.trim(),
-        photos: _uploadedPhotos.map((photo) => photo.path).toList(),
-        thumbnail: _thumbnailUrl!,
-      );
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Libro agregado con éxito')),
-      );
-
-      Navigator.pop(context, true); 
-    } catch (e) {
-      if (!mounted) return;
-      print("Error al agregar libro: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al agregar el libro: $e')),
-      );
-    }
-  }
-
   Future<void> _pickImages() async {
     final ImagePicker picker = ImagePicker();
     final List<XFile>? images = await picker.pickMultiImage();
@@ -107,6 +73,13 @@ class _AddBookDialogState extends State<AddBookDialog> {
         _uploadedPhotos.addAll(images.map((img) => File(img.path)));
       });
     }
+  }
+
+  void _navigateToManualAdd() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddBookManualScreen()),
+    );
   }
 
   @override
@@ -144,6 +117,10 @@ class _AddBookDialogState extends State<AddBookDialog> {
             _buildPhotoPicker(),
             const SizedBox(height: 24),
             _buildSubmitButton(),
+            const SizedBox(height: 24),
+            Divider(color: AppColors.iconSelected.withOpacity(0.5)),
+            const SizedBox(height: 16),
+            _buildManualAddOption(),
           ],
         ),
       ),
@@ -170,6 +147,35 @@ class _AddBookDialogState extends State<AddBookDialog> {
                 color: AppColors.textPrimary.withOpacity(0.7),
               ),
             ),
+    );
+  }
+
+  Widget _buildManualAddOption() {
+    return Column(
+      children: [
+        Text(
+          "¿No encuentras tu libro?",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        ElevatedButton.icon(
+          onPressed: _navigateToManualAdd,
+          icon: const Icon(Icons.add_circle_outline),
+          label: const Text("Agregar Manualmente"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.iconSelected,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -209,7 +215,7 @@ class _AddBookDialogState extends State<AddBookDialog> {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
-      onPressed: _isLoading ? null : _addBookToUser,
+      onPressed: _isLoading ? null : () {}, // Agregar la lógica de envío
       child: _isLoading
           ? const CircularProgressIndicator(color: Colors.white)
           : Text(

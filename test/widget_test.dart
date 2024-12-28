@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -13,7 +12,7 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => ThemeNotifier()),
-          ChangeNotifierProvider(create: (_) => AuthNotifier()),
+          ChangeNotifierProvider(create: (_) => AuthNotifier()),  
         ],
         child: const MyApp(),
       ),

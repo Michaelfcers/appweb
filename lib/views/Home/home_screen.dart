@@ -123,7 +123,8 @@ class HomeScreenState extends State<HomeScreen> {
                       itemCount: allBooks.length,
                       itemBuilder: (context, index) {
                         final book = allBooks[index];
-                        final heroTag = 'book-${book.id ?? book.title}-$index';
+                        final heroTag = 'book-${book.id}-$index';
+
 
                         return GestureDetector(
                           onTap: () {

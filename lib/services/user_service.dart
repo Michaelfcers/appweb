@@ -86,6 +86,8 @@ class UserService {
 }
 
 
+
+
   // Obtener libros subidos por el usuario autenticado
   Future<List<Book>> getUploadedBooks() async {
     final userId = getCurrentUserId();
@@ -159,6 +161,45 @@ class UserService {
     }
   }
 
+
+  // Obtener perfil y libros de un usuario específico
+Future<Map<String, dynamic>> getUserProfileAndBooks(String userId) async {
+  try {
+    // Obtener detalles del usuario
+    final userDetailsResponse = await _supabase
+        .from('users')
+        .select('nickname, name, experience')
+        .eq('id', userId)
+        .single();
+
+    if (userDetailsResponse == null || userDetailsResponse.isEmpty) {
+      throw Exception('Usuario no encontrado.');
+    }
+
+    // Obtener libros subidos por el usuario
+    final booksResponse = await _supabase
+        .from('books')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', ascending: false);
+
+    List<Book> books = [];
+    if (booksResponse is List && booksResponse.isNotEmpty) {
+      books = booksResponse.map((book) => Book.fromSupabaseJson(book)).toList();
+    }
+
+    // Retornar un mapa con los detalles y libros del usuario
+    return {
+      'userDetails': userDetailsResponse as Map<String, dynamic>,
+      'userBooks': books,
+    };
+  } catch (error) {
+    print('Error al obtener perfil y libros del usuario: $error');
+    throw Exception('Error al obtener perfil y libros del usuario: $error');
+  }
+}
+
+
   // Método para obtener libros de otros usuarios
   Future<List<Book>> getBooksFromOtherUsers() async {
     try {
@@ -224,6 +265,35 @@ class UserService {
       throw Exception("Error al agregar detalle de trueque: $e");
     }
   }
+
+
+// Obtener información del usuario que subió un libro
+Future<Map<String, String?>> getUserDetailsByBookId(String bookId) async {
+  try {
+    final response = await _supabase
+        .from('books')
+        .select('user_id, users(nickname, name)')
+        .eq('id', bookId)
+        .single();
+
+    if (response == null || response.isEmpty) {
+      throw Exception('No se encontró información del usuario.');
+    }
+
+    return {
+      'nickname': response['users']?['nickname'],
+      'name': response['users']?['name'],
+    };
+  } catch (e) {
+    print('Error al obtener detalles del usuario: $e');
+    return {
+      'nickname': 'Usuario desconocido',
+      'name': 'Usuario desconocido',
+    };
+  }
+}
+
+
 
 // Notificar a un usuario sobre una propuesta
 Future<void> notifyUser({
