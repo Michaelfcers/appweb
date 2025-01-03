@@ -65,6 +65,15 @@ class Book {
     );
   }
 
+String get primaryImage {
+  if (thumbnail.isNotEmpty) {
+    return thumbnail;
+  } else if (photos != null && photos!.isNotEmpty) {
+    return photos!.first;
+  }
+  return 'https://via.placeholder.com/150'; // Imagen de marcador por defecto
+}
+
   // Método para convertir un objeto Book a JSON (útil para actualizar libros)
   Map<String, dynamic> toJson() {
     return {

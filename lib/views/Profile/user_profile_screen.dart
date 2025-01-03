@@ -169,7 +169,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                       topRight: Radius.circular(10),
                                     ),
                                     image: DecorationImage(
-                                      image: NetworkImage(book.thumbnail),
+                                      image: NetworkImage(
+                                        _determineThumbnail(book),
+                                      ),
                                       fit: BoxFit.cover,
                                     ),
                                   ),
@@ -212,5 +214,27 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ],
             ),
     );
+  }
+
+  String _determineThumbnail(Book book) {
+    // Prioriza las imágenes subidas manualmente.
+    if (book.photos != null && book.photos!.isNotEmpty) {
+      return _sanitizeImageUrl(book.photos!.first);
+    }
+
+    // Si no hay imágenes subidas, usa el thumbnail de la API.
+    if (book.thumbnail.isNotEmpty) {
+      return _sanitizeImageUrl(book.thumbnail);
+    }
+
+    // Si no hay ninguna imagen, usa una imagen predeterminada.
+    return 'https://via.placeholder.com/150';
+  }
+
+  String _sanitizeImageUrl(String url) {
+    if (url.contains('/books/books/')) {
+      return url.replaceAll('/books/books/', '/books/');
+    }
+    return url;
   }
 }

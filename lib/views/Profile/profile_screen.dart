@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../models/book_model.dart';
 import '../../../services/user_service.dart';
 import '../Settings/settings_screen.dart';
 import '../Books/add_book_dialog.dart';
@@ -9,6 +8,8 @@ import '../../styles/colors.dart';
 import 'edit_profile_screen.dart';
 import '../../styles/theme_notifier.dart';
 import '../../auth_notifier.dart';
+import '../../../models/book_model.dart'; // Verifica si esta ruta es correcta.
+
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -63,14 +64,12 @@ class ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> fetchAchievements() async {
     try {
-      // Obtener logros disponibles y completados
       final allAchievements = await userService.fetchAllAchievements();
       final completedAchievements = await userService.fetchUserAchievements();
       final completedIds = completedAchievements
           .map((achievement) => achievement['achievement_id'])
           .toSet();
 
-      // Combinar logros y marcar los completados
       setState(() {
         achievements = allAchievements.map((achievement) {
           return {
@@ -217,135 +216,154 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildBooksGrid() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 8.0,
-          crossAxisSpacing: 8.0,
-          childAspectRatio: 1.0,
-        ),
-        itemCount: uploadedBooks.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return GestureDetector(
-              onTap: () async {
-                final shouldUpdate = await showDialog<bool>(
-                  context: context,
-                  builder: (BuildContext context) => const AddBookDialog(),
-                );
+  return Padding(
+    padding: const EdgeInsets.all(8.0),
+    child: GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 8.0,
+        crossAxisSpacing: 8.0,
+        childAspectRatio: 1.0,
+      ),
+      itemCount: uploadedBooks.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return GestureDetector(
+            onTap: () async {
+              final shouldUpdate = await showDialog<bool>(
+                context: context,
+                builder: (BuildContext context) => const AddBookDialog(),
+              );
 
-                if (shouldUpdate == true) {
-                  await fetchUploadedBooks();
-                }
-              },
-              child: Card(
-                color: AppColors.cardBackground,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 3,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add,
-                          color: AppColors.iconSelected, size: 36),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Agregar libro',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.iconSelected,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              if (shouldUpdate == true) {
+                await fetchUploadedBooks();
+              }
+            },
+            child: Card(
+              color: AppColors.cardBackground,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-            );
-          } else {
-            final book = uploadedBooks[index - 1];
-            return GestureDetector(
-              onTap: () async {
-                final shouldUpdate = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => BookDetailsScreen(
-                      book: book,
-                      onDelete: (deletedBookId) {
-                        setState(() {
-                          uploadedBooks
-                              .removeWhere((b) => b.id == deletedBookId);
-                        });
-                      },
-                    ),
-                  ),
-                );
-
-                if (shouldUpdate == true) {
-                  await fetchUploadedBooks();
-                }
-              },
-              child: Card(
-                color: AppColors.cardBackground,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 3,
+              elevation: 3,
+              child: Center(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      height: 100,
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(10),
-                          topRight: Radius.circular(10),
-                        ),
-                        image: DecorationImage(
-                          image: NetworkImage(book.thumbnail),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        book.title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        book.author,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+                    Icon(Icons.add, color: AppColors.iconSelected, size: 36),
                     const SizedBox(height: 8),
+                    Text(
+                      'Agregar libro',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.iconSelected,
+                      ),
+                    ),
                   ],
                 ),
               ),
-            );
-          }
-        },
-      ),
-    );
+            ),
+          );
+        } else {
+          final book = uploadedBooks[index - 1];
+          final String thumbnail = _determineThumbnail(book);
+
+          return GestureDetector(
+            onTap: () async {
+              final shouldUpdate = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => BookDetailsScreen(
+                    bookId: book.id,
+                    onDelete: (deletedBookId) {
+                      setState(() {
+                        uploadedBooks.removeWhere((b) => b.id == deletedBookId);
+                      });
+                    },
+                  ),
+                ),
+              );
+
+              if (shouldUpdate == true) {
+                await fetchUploadedBooks();
+              }
+            },
+            child: Card(
+              color: AppColors.cardBackground,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              elevation: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Imagen principal del libro
+                  Container(
+                    height: 100,
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(10),
+                        topRight: Radius.circular(10),
+                      ),
+                      image: DecorationImage(
+                        image: NetworkImage(thumbnail),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      book.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Text(
+                      book.author,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          );
+        }
+      },
+    ),
+  );
+}
+
+String _determineThumbnail(Book book) {
+  // Si hay imágenes subidas manualmente, usa la primera de ellas
+  if (book.photos != null && book.photos!.isNotEmpty) {
+    return _sanitizeImageUrl(book.photos!.first);
   }
+
+  // Si no hay imágenes subidas manualmente, usa el thumbnail de la API
+  return _sanitizeImageUrl(book.thumbnail);
+}
+
+String _sanitizeImageUrl(String url) {
+  if (url.contains('/books/books/')) {
+    return url.replaceAll('/books/books/', '/books/');
+  }
+  return url;
+}
+
 
   Widget _buildAchievementsList() {
     return ListView.builder(
@@ -368,7 +386,7 @@ class ProfileScreenState extends State<ProfileScreen> {
             title: Text(
               achievement['name'],
               style: TextStyle(
-      color: Colors.black, // Nombres de logros en negro
+                color: AppColors.textPrimary,
               ),
             ),
             subtitle: Text(

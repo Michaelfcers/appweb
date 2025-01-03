@@ -27,10 +27,16 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _loadGenres() async {
-    final genres = await _supabaseService.fetchGenres();
-    setState(() {
-      _genres = genres;
-    });
+    try {
+      final genres = await _supabaseService.fetchGenres();
+      if (mounted) {
+        setState(() {
+          _genres = genres;
+        });
+      }
+    } catch (error) {
+      debugPrint('Error al cargar géneros: $error');
+    }
   }
 
   void _performSearch(String query) async {
@@ -39,12 +45,22 @@ class _SearchScreenState extends State<SearchScreen> {
       _selectedGenre = null;
     });
 
-    final results = await _supabaseService.searchBooks(query);
-
-    setState(() {
-      _searchResults = results;
-      _isLoading = false;
-    });
+    try {
+      final results = await _supabaseService.searchBooks(query);
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isLoading = false;
+        });
+      }
+    } catch (error) {
+      debugPrint('Error al realizar la búsqueda: $error');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _selectGenre(String genre) async {
@@ -54,12 +70,22 @@ class _SearchScreenState extends State<SearchScreen> {
       _selectedGenre = genre;
     });
 
-    final results = await _supabaseService.searchBooksByGenre(genre);
-
-    setState(() {
-      _searchResults = results;
-      _isLoading = false;
-    });
+    try {
+      final results = await _supabaseService.searchBooksByGenre(genre);
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isLoading = false;
+        });
+      }
+    } catch (error) {
+      debugPrint('Error al buscar por género: $error');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _clearSearch() {
@@ -106,8 +132,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 fillColor: AppColors.cardBackground,
               ),
               style: TextStyle(
-    color: AppColors.black, // Cambiar el color del texto ingresado
-  ),
+                color: AppColors.black,
+              ),
             ),
             const SizedBox(height: 16),
             if (_genres.isNotEmpty)
@@ -160,9 +186,16 @@ class _SearchScreenState extends State<SearchScreen> {
                               leading: Hero(
                                 tag: book.id,
                                 child: Image.network(
-                                  book.thumbnail,
+                                  _determineThumbnail(book),
                                   width: 50,
+                                  height: 50,
                                   fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (context, error, stackTrace) => Icon(
+                                    Icons.broken_image,
+                                    size: 50,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ),
                               title: Text(
@@ -198,5 +231,27 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
     );
+  }
+
+  String _determineThumbnail(Book book) {
+    // Prioriza las imágenes subidas manualmente.
+    if (book.photos != null && book.photos!.isNotEmpty) {
+      return _sanitizeImageUrl(book.photos!.first);
+    }
+
+    // Si no hay imágenes subidas, usa el thumbnail de la API.
+    if (book.thumbnail.isNotEmpty) {
+      return _sanitizeImageUrl(book.thumbnail);
+    }
+
+    // Si no hay ninguna imagen, usa una imagen predeterminada.
+    return 'https://via.placeholder.com/150';
+  }
+
+  String _sanitizeImageUrl(String url) {
+    if (url.contains('/books/books/')) {
+      return url.replaceAll('/books/books/', '/books/');
+    }
+    return url;
   }
 }

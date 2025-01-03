@@ -116,31 +116,68 @@ class UserService {
     }
   }
 
-  // Actualizar un libro existente
-  Future<void> updateBook({
-    required String bookId,
-    required String title,
-    required String description,
-    required String condition, // Incluye el campo condición
-  }) async {
-    try {
-      final response = await _supabase.from('books').update({
-        'title': title,
-        'synopsis': description,
-        'condition': condition, // Actualización de condición
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', bookId).select();
+Future<void> updateBook({
+  required String bookId,
+  required String title,
+  required String description,
+  required String condition,
+  List<String>? photos, // Lista de fotos actualizadas
+  List<String>? deletedPhotos, // Lista de fotos eliminadas
+}) async {
+  try {
+    // Construye el mapa de actualizaciones
+    final updates = {
+      'title': title,
+      'synopsis': description,
+      'condition': condition,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
 
-      if (response == null || response.isEmpty) {
-        throw Exception('No se pudo actualizar el libro. Respuesta inesperada.');
-      }
-
-      print("Libro actualizado correctamente.");
-    } catch (e) {
-      print('Error al actualizar el libro: $e');
-      rethrow;
+    // Si hay fotos, conviértelas a JSON y agrégalas al mapa de actualizaciones
+    if (photos != null && photos.isNotEmpty) {
+      updates['photos'] = jsonEncode(photos); // Convierte la lista a JSON
     }
+
+    // Maneja la eliminación de fotos si es necesario
+    if (deletedPhotos != null && deletedPhotos.isNotEmpty) {
+      for (final photoUrl in deletedPhotos) {
+        await _supabase.storage.from('books').remove([photoUrl]);
+      }
+    }
+
+    // Realiza la actualización en la base de datos
+    final response = await _supabase
+        .from('books') // Asegúrate de que 'books' sea el nombre de tu tabla
+        .update(updates)
+        .eq('id', bookId)
+        .select();
+
+    if (response == null || response.isEmpty) {
+      throw Exception('No se pudo actualizar el libro. Respuesta inesperada.');
+    }
+
+    print("Libro actualizado correctamente.");
+  } catch (e) {
+    print('Error al actualizar el libro: $e');
+    rethrow;
   }
+}
+
+Future<Book> getBookById(String bookId) async {
+  final response = await _supabase
+      .from('books')
+      .select()
+      .eq('id', bookId)
+      .single();
+
+  if (response == null || response.isEmpty) {
+    throw Exception('No se encontró el libro.');
+  }
+
+  return Book.fromSupabaseJson(response);
+}
+
+
 
   // Método para eliminar un libro
   Future<void> deleteBook(String bookId) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import '../../models/book_model.dart';
-import '../../services/google_books_service.dart';
 import '../../services/user_service.dart';
 import '../../styles/colors.dart';
 
@@ -21,26 +22,37 @@ class _BookEditScreenState extends State<BookEditScreen> {
   late TextEditingController _genreController;
 
   final UserService _userService = UserService();
-  final GoogleBooksService _googleBooksService = GoogleBooksService();
+  final ImagePicker _imagePicker = ImagePicker();
 
+  List<String> _existingPhotos = [];
+  List<File> _newPhotos = [];
+  List<String> _deletedPhotos = [];
   bool _isLoading = false;
 
   @override
-  void initState() {
-    super.initState();
-    // Inicializar controladores con los datos actuales del libro
-    _titleController = TextEditingController(text: widget.book.title);
-    _synopsisController =
-        TextEditingController(text: widget.book.description ?? '');
-    _conditionController =
-        TextEditingController(text: widget.book.condition ?? '');
-    _authorController = TextEditingController(text: widget.book.author);
-    _genreController = TextEditingController(text: widget.book.genre ?? '');
+void initState() {
+  super.initState();
+  _titleController = TextEditingController(text: widget.book.title);
+  _synopsisController = TextEditingController(text: widget.book.description ?? '');
+  _conditionController = TextEditingController(text: widget.book.condition ?? '');
+  _authorController = TextEditingController(text: widget.book.author);
+  _genreController = TextEditingController(text: widget.book.genre ?? '');
+
+  // Sanitizar URLs de imágenes existentes
+  _existingPhotos = widget.book.photos?.map(_sanitizeImageUrl).toList() ?? [];
+}
+
+String _sanitizeImageUrl(String url) {
+  if (url.contains('/books/books/')) {
+    return url.replaceAll('/books/books/', '/books/');
   }
+  return url;
+}
+
+
 
   @override
   void dispose() {
-    // Liberar los controladores al salir de la pantalla
     _titleController.dispose();
     _synopsisController.dispose();
     _conditionController.dispose();
@@ -49,70 +61,77 @@ class _BookEditScreenState extends State<BookEditScreen> {
     super.dispose();
   }
 
-  Future<void> _saveChanges() async {
-  setState(() {
-    _isLoading = true;
-  });
+  Future<void> _pickImages() async {
+    final List<XFile>? images = await _imagePicker.pickMultiImage();
+    if (images != null) {
+      setState(() {
+        _newPhotos.addAll(images.map((img) => File(img.path)));
+      });
+    }
+  }
 
-  try {
-    // Llamada al servicio para actualizar el libro
-    await _userService.updateBook(
-      bookId: widget.book.id,
-      title: _titleController.text.trim(),
-      description: _synopsisController.text.trim(),
-      condition: _conditionController.text.trim(),
-    );
-
-    // Crear una copia del libro actualizado
-    final updatedBook = Book(
-      id: widget.book.id,
-      title: _titleController.text.trim(),
-      author: _authorController.text.trim(),
-      thumbnail: widget.book.thumbnail,
-      genre: _genreController.text.trim(),
-      description: _synopsisController.text.trim(),
-      condition: _conditionController.text.trim(),
-      userId: widget.book.userId,
-      photos: widget.book.photos,
-    );
-
-    if (!mounted) return;
-
-    // Mostrar diálogo de éxito
-    await _showSaveSuccessDialog();
-
-    // Retornar a la pantalla anterior con el libro actualizado
-    Navigator.pop(context, updatedBook);
-  } catch (e) {
-    if (!mounted) return;
-
-    // Mostrar diálogo de error
-    await _showSaveErrorDialog();
-  } finally {
+  void _removePhoto(String photoUrl) {
     setState(() {
-      _isLoading = false;
+      _existingPhotos.remove(photoUrl);
+      _deletedPhotos.add(photoUrl);
     });
   }
-}
 
-  Future<void> _searchBook(String title) async {
+  void _removeNewPhoto(File photo) {
+    setState(() {
+      _newPhotos.remove(photo);
+    });
+  }
+
+  Future<void> _saveChanges() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      final book = await _googleBooksService.fetchBookDetails(title);
-      setState(() {
-        _authorController.text = book.author;
-        _genreController.text = book.genre ?? '';
-        _synopsisController.text = book.description ?? '';
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Error al buscar el libro: $e',
-            style: TextStyle(color: Colors.white),
-          ),
-          backgroundColor: Colors.red,
-        ),
+      // Subir las nuevas imágenes
+      List<String> uploadedPhotos = [];
+      for (File photo in _newPhotos) {
+        final String imageUrl = await _userService.uploadImageToStorage(
+          photo.path,
+          'image_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+        uploadedPhotos.add(imageUrl);
+      }
+
+      // Actualizar el libro
+      await _userService.updateBook(
+        bookId: widget.book.id,
+        title: _titleController.text.trim(),
+        description: _synopsisController.text.trim(),
+        condition: _conditionController.text.trim(),
+        photos: [..._existingPhotos, ...uploadedPhotos],
+        deletedPhotos: _deletedPhotos,
       );
+
+      final updatedBook = Book(
+        id: widget.book.id,
+        title: _titleController.text.trim(),
+        author: _authorController.text.trim(),
+        thumbnail: widget.book.thumbnail,
+        genre: _genreController.text.trim(),
+        description: _synopsisController.text.trim(),
+        condition: _conditionController.text.trim(),
+        userId: widget.book.userId,
+        photos: [..._existingPhotos, ...uploadedPhotos],
+      );
+
+      if (!mounted) return;
+
+      await _showSaveSuccessDialog();
+      Navigator.pop(context, updatedBook);
+    } catch (e) {
+      if (!mounted) return;
+      await _showSaveErrorDialog();
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -136,7 +155,7 @@ class _BookEditScreenState extends State<BookEditScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Imagen del libro
+            // Imagen del libro (thumbnail)
             Container(
               width: 160,
               height: 220,
@@ -144,43 +163,46 @@ class _BookEditScreenState extends State<BookEditScreen> {
                 color: AppColors.shadow,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: widget.book.thumbnail.isNotEmpty
-                  ? Image.network(widget.book.thumbnail, fit: BoxFit.cover)
-                  : Center(
-                      child: Text(
-                        '160 x 220',
-                        style: TextStyle(color: AppColors.textPrimary),
-                      ),
-                    ),
-            ),
-            const SizedBox(height: 24),
+              child: _existingPhotos.isNotEmpty
+      ? ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            _existingPhotos.first, // Usa la primera imagen como principal
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Center(
+                child: Icon(
+                  Icons.broken_image,
+                  size: 50,
+                  color: AppColors.textPrimary.withOpacity(0.7),
+                ),
+              );
+            },
+          ),
+        )
+      : Center(
+          child: Icon(
+            Icons.book,
+            size: 50,
+            color: AppColors.textPrimary.withOpacity(0.7),
+          ),
+        ),
+        ),
 
-            // Campo para el título con búsqueda
-            _buildTextField(
-              _titleController,
-              'Título',
-              onChanged: (value) {
-                if (value.isNotEmpty) _searchBook(value);
-              },
-              isEditable: true,
-            ),
+            // Campos de texto
+            _buildTextField(_titleController, 'Título', isEditable: true),
             const SizedBox(height: 10),
-
-            // Campos no editables
-            _buildTextField(_authorController, 'Autor', isEditable: false),
+            _buildTextField(_authorController, 'Autor', isEditable: true),
             const SizedBox(height: 10),
-            _buildTextField(_genreController, 'Género', isEditable: false),
+            _buildTextField(_genreController, 'Género', isEditable: true),
             const SizedBox(height: 10),
             _buildTextField(
               _synopsisController,
               'Sinopsis',
-              isEditable: false,
+              isEditable: true,
               maxLines: 3,
             ),
-
             const SizedBox(height: 10),
-
-            // Campo editable
             _buildTextField(
               _conditionController,
               'Condición',
@@ -190,12 +212,108 @@ class _BookEditScreenState extends State<BookEditScreen> {
 
             const SizedBox(height: 24),
 
-            // Botón de Guardar Cambios
+            // Gestión de imágenes existentes
+            if (_existingPhotos.isNotEmpty) ...[
+              Text(
+                "Imágenes existentes",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.iconSelected,
+                ),
+              ),
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: _existingPhotos.length,
+                itemBuilder: (context, index) {
+                  final photoUrl = _existingPhotos[index];
+                  return Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          photoUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                        ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: IconButton(
+                          icon: Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _removePhoto(photoUrl),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // Subir nuevas imágenes
+            ElevatedButton.icon(
+              onPressed: _pickImages,
+              icon: const Icon(Icons.upload_file),
+              label: const Text("Subir Imágenes"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.iconSelected,
+              ),
+            ),
+
+            if (_newPhotos.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: _newPhotos.length,
+                itemBuilder: (context, index) {
+                  final photo = _newPhotos[index];
+                  return Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          photo,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                        ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: IconButton(
+                          icon: Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _removeNewPhoto(photo),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // Botón de guardar cambios
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.iconSelected,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -205,8 +323,7 @@ class _BookEditScreenState extends State<BookEditScreen> {
                   ? const CircularProgressIndicator(color: Colors.white)
                   : Text(
                       "Guardar cambios",
-                      style:
-                          TextStyle(fontSize: 18, color: AppColors.textPrimary),
+                      style: TextStyle(fontSize: 18, color: AppColors.textPrimary),
                     ),
             ),
           ],
@@ -216,150 +333,144 @@ class _BookEditScreenState extends State<BookEditScreen> {
   }
 
   Widget _buildTextField(
-  TextEditingController controller,
-  String label, {
-  required bool isEditable,
-  int maxLines = 1,
-  Function(String)? onChanged,
-}) {
-  return TextField(
-    controller: controller,
-    maxLines: maxLines,
-    enabled: isEditable,
-    onChanged: onChanged,
-    decoration: InputDecoration(
-      labelText: label,
-      labelStyle: TextStyle(color: AppColors.iconSelected),
-      filled: true,
-      fillColor: AppColors.cardBackground,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: AppColors.iconSelected),
+    TextEditingController controller,
+    String label, {
+    required bool isEditable,
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      enabled: isEditable,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: AppColors.iconSelected),
+        filled: true,
+        fillColor: AppColors.cardBackground,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.iconSelected),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.iconSelected),
+        ),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: AppColors.iconSelected),
-      ),
-    ),
-    style: const TextStyle(color: Colors.black), // Explicitly set text color to black
-  );
-}
-
-
+      style: const TextStyle(color: Colors.black),
+    );
+  }
 
   Future<void> _showSaveSuccessDialog() async {
-  await showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      backgroundColor: AppColors.dialogBackground,
-      contentPadding: const EdgeInsets.all(20),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check_circle, color: Colors.green, size: 60),
-          const SizedBox(height: 16),
-          Text(
-            "Éxito",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppColors.dialogTitleText,
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        backgroundColor: AppColors.dialogBackground,
+        contentPadding: const EdgeInsets.all(20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 60),
+            const SizedBox(height: 16),
+            Text(
+              "Éxito",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.dialogTitleText,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "El libro se guardó con éxito.",
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.dialogBodyText,
+            const SizedBox(height: 8),
+            Text(
+              "El libro se guardó con éxito.",
+              style: TextStyle(
+                fontSize: 16,
+                color: AppColors.dialogBodyText,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
+          ],
+        ),
+        actions: [
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.iconSelected,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                "Aceptar",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFFF1EFE7),
+                ),
+              ),
+            ),
           ),
         ],
       ),
-      actions: [
-        Center(
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.iconSelected,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+    );
+  }
+
+  Future<void> _showSaveErrorDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        backgroundColor: AppColors.dialogBackground,
+        contentPadding: const EdgeInsets.all(20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error, color: Colors.red, size: 60),
+            const SizedBox(height: 16),
+            Text(
+              "Error",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.dialogTitleText,
               ),
             ),
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              "Aceptar",
+            const SizedBox(height: 8),
+            Text(
+              "No se pudo guardar el libro. Por favor, intenta de nuevo.",
               style: TextStyle(
                 fontSize: 16,
-                color: Color(0xFFF1EFE7),
+                color: AppColors.dialogBodyText,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.iconSelected,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                "Aceptar",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFFF1EFE7),
+                ),
               ),
             ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Future<void> _showSaveErrorDialog() async {
-  await showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      backgroundColor: AppColors.dialogBackground,
-      contentPadding: const EdgeInsets.all(20),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error, color: Colors.red, size: 60),
-          const SizedBox(height: 16),
-          Text(
-            "Error",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppColors.dialogTitleText,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "No se pudo guardar el libro. Por favor, intenta de nuevo.",
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.dialogBodyText,
-            ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
-      actions: [
-        Center(
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.iconSelected,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              "Aceptar",
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFFF1EFE7),
-              ),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
+    );
+  }
 }
-
-}
-

@@ -86,7 +86,8 @@ class HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const NotificationsScreen()),
               );
             },
           ),
@@ -114,8 +115,9 @@ class HomeScreenState extends State<HomeScreen> {
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2, 
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
                         crossAxisSpacing: 16.0,
                         mainAxisSpacing: 16.0,
                         childAspectRatio: 0.7,
@@ -124,7 +126,6 @@ class HomeScreenState extends State<HomeScreen> {
                       itemBuilder: (context, index) {
                         final book = allBooks[index];
                         final heroTag = 'book-${book.id}-$index';
-
 
                         return GestureDetector(
                           onTap: () {
@@ -164,8 +165,14 @@ class HomeScreenState extends State<HomeScreen> {
                                           topRight: Radius.circular(15),
                                         ),
                                         image: DecorationImage(
-                                          image: NetworkImage(book.thumbnail),
+                                          image: NetworkImage(
+                                            _determineThumbnail(book),
+                                          ),
                                           fit: BoxFit.cover,
+                                          onError: (exception, stackTrace) {
+                                            debugPrint(
+                                                'Error loading image: $exception');
+                                          },
                                         ),
                                       ),
                                     ),
@@ -174,14 +181,15 @@ class HomeScreenState extends State<HomeScreen> {
                                 Padding(
                                   padding: const EdgeInsets.all(12.0),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         book.title,
                                         style: GoogleFonts.poppins(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
-                                          color: AppColors.cardTitleColor, // Texto siempre oscuro
+                                          color: AppColors.cardTitleColor,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -191,7 +199,7 @@ class HomeScreenState extends State<HomeScreen> {
                                         book.author,
                                         style: GoogleFonts.poppins(
                                           fontSize: 14,
-                                          color: AppColors.cardAuthorColor, // Autor también oscuro
+                                          color: AppColors.cardAuthorColor,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -241,7 +249,7 @@ class HomeScreenState extends State<HomeScreen> {
             physics: const NeverScrollableScrollPhysics(),
             key: const Key('skeleton_grid'),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, 
+              crossAxisCount: 2,
               crossAxisSpacing: 16.0,
               mainAxisSpacing: 16.0,
               childAspectRatio: 0.7,
@@ -264,5 +272,27 @@ class HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  String _determineThumbnail(Book book) {
+    // Prioriza las imágenes subidas manualmente.
+    if (book.photos != null && book.photos!.isNotEmpty) {
+      return _sanitizeImageUrl(book.photos!.first);
+    }
+
+    // Si no hay imágenes subidas, usa el thumbnail de la API.
+    if (book.thumbnail.isNotEmpty) {
+      return _sanitizeImageUrl(book.thumbnail);
+    }
+
+    // Si no hay ninguna imagen, usa una imagen predeterminada.
+    return 'https://via.placeholder.com/150';
+  }
+
+  String _sanitizeImageUrl(String url) {
+    if (url.contains('/books/books/')) {
+      return url.replaceAll('/books/books/', '/books/');
+    }
+    return url;
   }
 }
