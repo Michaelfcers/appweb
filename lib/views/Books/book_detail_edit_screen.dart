@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 import '../../models/book_model.dart';
 import '../../styles/colors.dart';
-import 'book_edit_screen.dart';
 import '../../services/user_service.dart';
+import 'book_edit_screen.dart';
 
 class BookDetailsScreen extends StatefulWidget {
-  Book book; // Deja de ser final para actualizarlo después de edición
-  final Function(String) onDelete; // Callback para notificar la eliminación del libro
+  Book book;
+  final Function(String) onDelete;
 
   BookDetailsScreen({
-    super.key,
+    Key? key,
     required this.book,
     required this.onDelete,
-  });
+  }) : super(key: key);
 
   @override
-  BookDetailsScreenState createState() => BookDetailsScreenState();
+  _BookDetailsScreenState createState() => _BookDetailsScreenState();
 }
 
-class BookDetailsScreenState extends State<BookDetailsScreen> {
+class _BookDetailsScreenState extends State<BookDetailsScreen> {
   final UserService _userService = UserService();
   bool isExpanded = false;
   bool _isDeleting = false;
@@ -50,8 +50,8 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
                 backgroundColor: Colors.redAccent,
               ),
               onPressed: () {
-                Navigator.of(context).pop(); // Cierra el diálogo
-                _deleteBook(); // Llama a la función de eliminar
+                Navigator.of(context).pop();
+                _deleteBook();
               },
               child: Text(
                 "Eliminar",
@@ -74,10 +74,8 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
 
       if (!mounted) return;
 
-      // Notificar al perfil que se eliminó el libro
       widget.onDelete(widget.book.id);
 
-      // Mostrar el SnackBar de éxito
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -88,12 +86,10 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
         ),
       );
 
-      // Regresar a la pantalla anterior
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
 
-      // Mostrar el SnackBar con el error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -108,6 +104,13 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
         _isDeleting = false;
       });
     }
+  }
+
+  String _sanitizeImageUrl(String url) {
+    if (url.contains('/books/books/')) {
+      return url.replaceAll('/books/books/', '/books/');
+    }
+    return url;
   }
 
   @override
@@ -132,7 +135,7 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Imagen del libro
+            // Imagen principal del libro
             Container(
               width: 160,
               height: 220,
@@ -140,14 +143,19 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
                 color: AppColors.shadow,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: book.thumbnail.isNotEmpty
-                  ? Image.network(book.thumbnail, fit: BoxFit.cover)
-                  : Center(
-                      child: Text(
-                        '160 x 220',
-                        style: TextStyle(color: AppColors.textPrimary),
-                      ),
+              child: Image.network(
+                _sanitizeImageUrl(book.thumbnail),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Icon(
+                      Icons.broken_image,
+                      size: 50,
+                      color: AppColors.textPrimary.withOpacity(0.7),
                     ),
+                  );
+                },
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -177,33 +185,6 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Calificación
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  "Calificación:",
-                  style: TextStyle(fontSize: 18, color: AppColors.textPrimary),
-                ),
-                const SizedBox(width: 8),
-                Row(
-                  children: List.generate(5, (index) {
-                    return Icon(
-                      Icons.star,
-                      size: 24,
-                      color: index < (book.rating ?? 0) ? Colors.amber : AppColors.shadow,
-                    );
-                  }),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  "${book.rating ?? 0}/5",
-                  style: TextStyle(fontSize: 18, color: AppColors.textPrimary),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
             // Sinopsis
             Text(
               "Sinopsis",
@@ -224,77 +205,119 @@ class BookDetailsScreenState extends State<BookDetailsScreen> {
             if (book.description != null && book.description!.length > 100)
               TextButton(
                 onPressed: () => setState(() => isExpanded = !isExpanded),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  backgroundColor: AppColors.iconSelected.withOpacity(0.1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
                 child: Text(
                   isExpanded ? "Ver menos" : "Ver más",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.iconSelected,
-                  ),
+                  style: TextStyle(color: AppColors.iconSelected),
                 ),
               ),
             const SizedBox(height: 24),
 
+            // Condición
+            if (book.condition != null && book.condition!.isNotEmpty) ...[
+              Text(
+                "Condición",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.iconSelected,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                book.condition!,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // Imágenes adicionales
+            if (book.photos != null && book.photos!.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Imágenes del libro",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.iconSelected,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: book.photos!.length,
+                    itemBuilder: (context, index) {
+                      final photoUrl = book.photos![index];
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          _sanitizeImageUrl(photoUrl),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                size: 50,
+                                color: AppColors.textPrimary.withOpacity(0.7),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            const SizedBox(height: 24),
+
             // Botones de Editar y Eliminar
-Row(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: [
-    ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.iconSelected,
-        padding: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      onPressed: () async {
-        final updatedBook = await Navigator.push<Book?>(
-          context,
-          MaterialPageRoute(
-            builder: (context) => BookEditScreen(book: widget.book),
-          ),
-        );
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.iconSelected,
+                    padding: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () async {
+                    final updatedBook = await Navigator.push<Book?>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BookEditScreen(book: widget.book),
+                      ),
+                    );
 
-        if (updatedBook != null) {
-          setState(() {
-            // Crear un nuevo objeto de tipo Book con los valores actualizados
-            widget.book = Book(
-              id: updatedBook.id,
-              title: updatedBook.title,
-              author: updatedBook.author,
-              thumbnail: updatedBook.thumbnail,
-              genre: updatedBook.genre,
-              rating: updatedBook.rating,
-              description: updatedBook.description,
-              condition: updatedBook.condition,
-              userId: updatedBook.userId,
-              photos: updatedBook.photos,
-            );
-          });
-        }
-      },
-      child: Icon(Icons.edit, color: AppColors.textPrimary, size: 32),
-    ),
-    const SizedBox(width: 20),
-    ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.redAccent,
-        padding: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      onPressed: _isDeleting ? null : () => _showDeleteConfirmationDialog(context),
-      child: _isDeleting
-          ? const CircularProgressIndicator(color: Colors.white)
-          : Icon(Icons.delete, color: AppColors.textPrimary, size: 32),
-    ),
-  ],
-),
-
+                    if (updatedBook != null) {
+                      setState(() {
+                        widget.book = updatedBook;
+                      });
+                    }
+                  },
+                  child: Icon(Icons.edit, color: AppColors.textPrimary, size: 32),
+                ),
+                const SizedBox(width: 20),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    padding: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _isDeleting ? null : () => _showDeleteConfirmationDialog(context),
+                  child: _isDeleting
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Icon(Icons.delete, color: AppColors.textPrimary, size: 32),
+                ),
+              ],
+            ),
           ],
         ),
       ),

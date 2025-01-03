@@ -24,32 +24,53 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
   bool _isLoading = false;
 
   Future<void> _addManualBook() async {
-    try {
-      if (_titleController.text.trim().isEmpty ||
-          _conditionController.text.trim().isEmpty) {
-        throw Exception('Por favor, completa todos los campos obligatorios');
-      }
-
-      await _userService.addBookToUser(
-        title: _titleController.text.trim(),
-        author: _authorController.text.trim(),
-        genre: _genreController.text.trim(),
-        description: _descriptionController.text.trim(),
-        condition: _conditionController.text.trim(),
-        photos: _uploadedPhotos.map((photo) => photo.path).toList(),
-        thumbnail: "", // Sin portada predeterminada
-      );
-
-      if (!mounted) return;
-
-      _showSuccessDialog(); // Muestra el diálogo de éxito
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al agregar el libro: $e')),
-      );
+  try {
+    if (_titleController.text.trim().isEmpty ||
+        _conditionController.text.trim().isEmpty ||
+        _uploadedPhotos.isEmpty) {
+      throw Exception(
+          'Por favor, completa todos los campos obligatorios y sube al menos una imagen.');
     }
+
+    // Subir imágenes a Supabase y obtener las URLs públicas
+    List<String> uploadedUrls = [];
+    for (int i = 0; i < _uploadedPhotos.length; i++) {
+      final imageUrl = await _userService.uploadImageToStorage(
+        _uploadedPhotos[i].path,
+        'image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
+      );
+      uploadedUrls.add(imageUrl);
+    }
+
+    if (uploadedUrls.isEmpty) {
+      throw Exception('Error al subir imágenes. Intenta nuevamente.');
+    }
+
+    // Usar la primera URL como portada
+    final thumbnailUrl = uploadedUrls.first;
+
+    // Guardar libro en Supabase
+    await _userService.addBookToUser(
+      title: _titleController.text.trim(),
+      author: _authorController.text.trim(),
+      genre: _genreController.text.trim(),
+      description: _descriptionController.text.trim(),
+      condition: _conditionController.text.trim(),
+      photos: uploadedUrls,
+      thumbnail: thumbnailUrl,
+    );
+
+    if (!mounted) return;
+
+    _showSuccessDialog(); // Mostrar diálogo de éxito
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error al agregar el libro: $e')),
+    );
   }
+}
+
 
   Future<void> _pickImages() async {
     final ImagePicker picker = ImagePicker();
@@ -60,6 +81,16 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
         _uploadedPhotos.addAll(images.map((img) => File(img.path)));
       });
     }
+  }
+
+  void _reorderImages(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) {
+        newIndex -= 1;
+      }
+      final File movedImage = _uploadedPhotos.removeAt(oldIndex);
+      _uploadedPhotos.insert(newIndex, movedImage);
+    });
   }
 
   @override
@@ -82,7 +113,7 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _buildThumbnailPlaceholder(),
+            _buildThumbnail(),
             const SizedBox(height: 24),
             _buildTextField(_titleController, 'Título'),
             const SizedBox(height: 10),
@@ -103,7 +134,7 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
     );
   }
 
-  Widget _buildThumbnailPlaceholder() {
+  Widget _buildThumbnail() {
     return Container(
       width: 160,
       height: 220,
@@ -111,13 +142,21 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
         color: AppColors.shadow,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Center(
-        child: Icon(
-          Icons.book,
-          size: 50,
-          color: AppColors.textPrimary.withOpacity(0.7),
-        ),
-      ),
+      child: _uploadedPhotos.isNotEmpty
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                _uploadedPhotos.first,
+                fit: BoxFit.cover,
+              ),
+            )
+          : Center(
+              child: Icon(
+                Icons.book,
+                size: 50,
+                color: AppColors.textPrimary.withOpacity(0.7),
+              ),
+            ),
     );
   }
 
@@ -132,21 +171,35 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
             backgroundColor: AppColors.iconSelected,
           ),
         ),
-        Wrap(
-          spacing: 8.0,
-          runSpacing: 4.0,
-          children: _uploadedPhotos
-              .map((photo) => ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      photo,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                    ),
-                  ))
-              .toList(),
-        ),
+        if (_uploadedPhotos.isNotEmpty)
+          ReorderableListView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            onReorder: _reorderImages,
+            children: _uploadedPhotos
+                .map((photo) => ListTile(
+                      key: ValueKey(photo),
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          photo,
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      title: const Text("Arrastra para cambiar portada"),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            _uploadedPhotos.remove(photo);
+                          });
+                        },
+                      ),
+                    ))
+                .toList(),
+          ),
       ],
     );
   }

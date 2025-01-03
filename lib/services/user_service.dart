@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/book_model.dart';
+import 'dart:io';
 
 class UserService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -161,6 +162,50 @@ class UserService {
     }
   }
 
+
+Future<String> uploadImageToStorage(String filePath, String fileName) async {
+  try {
+    // Realiza la subida de la imagen
+    final String uploadedPath = await _supabase.storage
+        .from('books') // Asegúrate de que el bucket sea 'books'
+        .upload(fileName, File(filePath)); // Asegúrate de que filePath sea correcto
+
+    // Obtén la URL pública de la imagen
+    final String publicUrl = _supabase.storage
+        .from('books')
+        .getPublicUrl(uploadedPath);
+
+    return publicUrl; // Retorna la URL pública
+  } catch (e) {
+    print('Error al subir imagen: $e');
+    throw Exception('Error al subir imagen: $e');
+  }
+}
+
+//Cargar imágenes a la BD
+Future<String> uploadImage(String filePath) async {
+    try {
+      final file = File(filePath);
+      final fileName = 'image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      // Upload the image to the Supabase storage bucket
+      final response = await _supabase.storage
+          .from('books') // Replace 'books' with your bucket name
+          .upload(fileName, file);
+
+      // Check if the response is a valid file name
+      if (response.isEmpty || response.contains('error')) {
+        throw Exception('Error uploading image: $response');
+      }
+
+      // Get the public URL of the uploaded image
+      final publicUrl = _supabase.storage.from('books').getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (e) {
+      throw Exception('Error uploading image: $e');
+    }
+  }
 
   // Obtener perfil y libros de un usuario específico
 Future<Map<String, dynamic>> getUserProfileAndBooks(String userId) async {
