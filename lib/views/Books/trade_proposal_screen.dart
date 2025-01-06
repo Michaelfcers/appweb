@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../models/book_model.dart';
 import '../../services/user_service.dart';
 import '../../styles/colors.dart';
-import 'add_book_dialog.dart';
 
 class TradeProposalScreen extends StatefulWidget {
   final String receiverId;
@@ -29,16 +28,32 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
   Future<void> fetchUserBooks() async {
     try {
       final books = await userService.getUploadedBooks();
+      if (!mounted) return;
       setState(() {
         availableBooks = books;
         isLoading = false;
       });
     } catch (e) {
-      print('Error al cargar los libros del usuario: $e');
+      debugPrint('Error al cargar los libros del usuario: $e');
+      if (!mounted) return;
       setState(() {
         isLoading = false;
       });
     }
+  }
+
+  String _determineThumbnail(Book book) {
+    if (book.photos != null && book.photos!.isNotEmpty) {
+      return _sanitizeImageUrl(book.photos!.first);
+    }
+    return _sanitizeImageUrl(book.thumbnail);
+  }
+
+  String _sanitizeImageUrl(String url) {
+    if (url.contains('/books/books/')) {
+      return url.replaceAll('/books/books/', '/books/');
+    }
+    return url;
   }
 
   void toggleBookSelection(Book book) {
@@ -56,6 +71,7 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
     setState(() {
       selectAll = !selectAll;
       if (selectAll) {
+        selectedBooks.clear();
         selectedBooks.addAll(availableBooks);
       } else {
         selectedBooks.clear();
@@ -63,26 +79,10 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
     });
   }
 
-  Future<void> addNewBook() async {
-    final Book? newBook = await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return const AddBookDialog();
-      },
-    );
-
-    if (newBook != null) {
-      setState(() {
-        availableBooks.add(newBook);
-      });
-    }
-  }
-
   Future<void> proposeTrade() async {
     if (selectedBooks.isEmpty) return;
 
-    // Mostrar popup de confirmación
-    final confirm = await showDialog(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
@@ -106,7 +106,7 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
                 backgroundColor: AppColors.iconSelected,
               ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Confirmar', style: TextStyle(color: AppColors.textPrimary)),
+              child: Text('Confirmar', style: TextStyle(color: AppColors.cardBackground)),
             ),
           ],
         );
@@ -122,13 +122,11 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
         throw Exception("Usuario no autenticado.");
       }
 
-      // Crear una nueva entrada en la tabla `barters`
       final String barterId = await userService.createBarter(
         proposerId: proposerId,
         receiverId: widget.receiverId,
       );
 
-      // Agregar los detalles del trueque (libros seleccionados)
       for (final book in selectedBooks) {
         await userService.addBarterDetail(
           barterId: barterId,
@@ -137,17 +135,18 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
         );
       }
 
-      // Notificar al usuario receptor
       await userService.notifyUser(
         receiverId: widget.receiverId,
         content: 'Tienes una nueva propuesta de trueque.',
-        type: 'trade_request', // Cambia a un valor válido para notification_type
-        barterId: barterId, // Asegura que este valor sea correcto.
+        type: 'trade_request',
+        barterId: barterId,
       );
 
+      if (!mounted) return;
       showSuccessDialog();
     } catch (e) {
-      print('Error al proponer el trueque: $e');
+      debugPrint('Error al proponer el trueque: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -165,23 +164,54 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           backgroundColor: AppColors.cardBackground,
+          contentPadding: const EdgeInsets.all(20),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.check_circle, color: Colors.green, size: 60),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               Text(
-                '¡Propuesta realizada con éxito!',
+                "Éxito",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "¡Propuesta realizada con éxito!",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textSecondary,
+                ),
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textPrimary),
               ),
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Aceptar', style: TextStyle(color: AppColors.iconSelected)),
+            Center(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.iconSelected,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  "Aceptar",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.cardBackground,
+                  ),
+                ),
+              ),
             ),
           ],
         );
@@ -207,152 +237,167 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  Text(
-                    'Selecciona los libros que deseas proponer para el trueque',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Seleccionar Todo',
-                        style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.shadow.withOpacity(0.2),
+                          blurRadius: 6,
+                          offset: const Offset(2, 2),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Selecciona los libros que deseas proponer para el trueque',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
                       ),
-                      Checkbox(
-                        value: selectAll,
-                        onChanged: (_) => toggleSelectAll(),
-                        activeColor: AppColors.iconSelected,
-                        checkColor: AppColors.cardBackground,
-                      ),
-                    ],
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: availableBooks.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index == availableBooks.length) {
-                          return GestureDetector(
-                            onTap: addNewBook,
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 8.0),
-                              padding: const EdgeInsets.all(16.0),
-                              decoration: BoxDecoration(
-                                color: AppColors.cardBackground,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.shadow,
-                                    blurRadius: 4,
-                                    offset: const Offset(2, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.add, color: AppColors.iconSelected),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Agregar libro',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.iconSelected),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        } else {
-                          final book = availableBooks[index];
-                          final isSelected = selectedBooks.contains(book);
-
-                          return GestureDetector(
-                            onTap: () => toggleBookSelection(book),
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 8.0),
-                              padding: const EdgeInsets.all(8.0),
-                              decoration: BoxDecoration(
-                                color: AppColors.cardBackground,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.shadow,
-                                    blurRadius: 4,
-                                    offset: const Offset(2, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 60,
-                                    height: 80,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      color: AppColors.shadow,
-                                      image: book.thumbnail.isNotEmpty
-                                          ? DecorationImage(
-                                              image: NetworkImage(book.thumbnail),
-                                              fit: BoxFit.cover,
-                                            )
-                                          : null,
-                                    ),
-                                    child: book.thumbnail.isEmpty
-                                        ? Center(
-                                            child: Text(
-                                              'Sin imagen',
-                                              style: TextStyle(color: AppColors.textSecondary),
-                                            ),
-                                          )
-                                        : null,
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          book.title,
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black, // Establece el color negro para el título
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                           book.author,
-        style: const TextStyle(
-          fontSize: 14,
-          color: Colors.black, )// Establece el color negro para el autor
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Checkbox(
-                                    value: isSelected,
-                                    activeColor: AppColors.iconSelected,
-                                    onChanged: (_) => toggleBookSelection(book),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }
-                      },
+                      textAlign: TextAlign.center,
                     ),
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: selectedBooks.isEmpty ? AppColors.shadow : AppColors.iconSelected,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                      backgroundColor: AppColors.iconSelected,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                     ),
-                    onPressed: selectedBooks.isEmpty ? null : proposeTrade,
-                    child: Text(
-                      'Proponer Trueque',
-                      style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
+                    onPressed: toggleSelectAll,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          selectAll ? Icons.check_box : Icons.check_box_outline_blank,
+                          color: AppColors.cardBackground,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          selectAll ? 'Deseleccionar todos' : 'Seleccionar todos',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.cardBackground,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: availableBooks.length,
+                      itemBuilder: (context, index) {
+                        final book = availableBooks[index];
+                        final isSelected = selectedBooks.contains(book);
+                        final thumbnail = _determineThumbnail(book);
+
+                        return GestureDetector(
+                          onTap: () => toggleBookSelection(book),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 8.0),
+                            padding: const EdgeInsets.all(8.0),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.iconSelected.withOpacity(0.1)
+                                  : AppColors.cardBackground,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.iconSelected
+                                    : Colors.transparent,
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.shadow.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(2, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 60,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    image: DecorationImage(
+                                      image: NetworkImage(thumbnail),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        book.title,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        book.author,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+Align(
+  alignment: Alignment.bottomCenter,
+  child: ElevatedButton(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppColors.iconSelected, // Cambiado a iconSelected
+      padding: const EdgeInsets.symmetric(
+        horizontal: 32, 
+        vertical: 14,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+    ),
+    onPressed: selectedBooks.isEmpty ? null : proposeTrade,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.swap_horiz, color: AppColors.cardBackground),
+        const SizedBox(width: 8),
+        Text(
+          'Proponer Trueque',
+          style: TextStyle(
+            fontSize: 16,
+            color: AppColors.cardBackground,
+            fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

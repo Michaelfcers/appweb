@@ -319,17 +319,21 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () async {
-                  final updatedBook = await Navigator.push<Book?>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => BookEditScreen(book: book),
-                    ),
-                  );
+  final updatedBook = await Navigator.push<Book?>(
+    context,
+    MaterialPageRoute(
+      builder: (context) => BookEditScreen(book: book),
+    ),
+  );
 
-                  if (updatedBook != null) {
-                    _loadBook();
-                  }
-                },
+  if (updatedBook != null) {
+    // Si el libro fue actualizado, recarga los datos
+    setState(() {
+      _bookFuture = Future.value(updatedBook); // Actualiza localmente
+    });
+    Navigator.pop(context, true); // Devuelve true al perfil para recargar
+  }
+},
                 child: Icon(Icons.edit, color: AppColors.textPrimary, size: 32),
               ),
               const SizedBox(width: 20),

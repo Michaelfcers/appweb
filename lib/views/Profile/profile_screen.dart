@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart' as app_provider;
 import '../../../services/user_service.dart';
 import '../Settings/settings_screen.dart';
 import '../Books/add_book_dialog.dart';
@@ -8,8 +9,7 @@ import '../../styles/colors.dart';
 import 'edit_profile_screen.dart';
 import '../../styles/theme_notifier.dart';
 import '../../auth_notifier.dart';
-import '../../../models/book_model.dart'; // Verifica si esta ruta es correcta.
-
+import '../../../models/book_model.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,29 +19,69 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class ProfileScreenState extends State<ProfileScreen> {
+  final SupabaseClient _supabase = Supabase.instance.client;
   final UserService userService = UserService();
   List<Book> uploadedBooks = [];
   List<Map<String, dynamic>> achievements = [];
   int totalXp = 0;
   bool isLoading = true;
   String nickname = "Usuario";
+  String name = "Nombre del Usuario"; // Campo para el nombre
+  String? avatarUrl; // Campo para la URL del avatar
   int _selectedTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    fetchUserData();
-    fetchUploadedBooks();
-    fetchAchievements();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    if (!mounted) return;
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      await Future.wait([
+        fetchUserData(),
+        fetchUploadedBooks(),
+        fetchAchievements(),
+      ]);
+    } catch (error) {
+      debugPrint('Error al cargar los datos: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> fetchUserData() async {
+    final userId = _supabase.auth.currentUser?.id;
+
+    if (userId == null) {
+      debugPrint("Usuario no autenticado");
+      return;
+    }
+
     try {
-      final userProfile = await userService.getUserProfile();
-      setState(() {
-        nickname = userProfile['nickname'] ?? "Usuario";
-        totalXp = userProfile['experience'] ?? 0;
-      });
+      final response = await _supabase
+          .from('users')
+          .select('name, nickname, avatar_url, experience')
+          .eq('id', userId)
+          .single();
+
+      if (response != null) {
+        setState(() {
+          name = response['name'] ?? "Nombre del Usuario";
+          nickname = response['nickname'] ?? "Usuario";
+          avatarUrl = response['avatar_url'];
+          totalXp = response['experience'] ?? 0;
+        });
+      }
     } catch (error) {
       debugPrint('Error al obtener el perfil del usuario: $error');
     }
@@ -50,15 +90,12 @@ class ProfileScreenState extends State<ProfileScreen> {
   Future<void> fetchUploadedBooks() async {
     try {
       final books = await userService.getUploadedBooks();
+      if (!mounted) return;
       setState(() {
         uploadedBooks = books;
-        isLoading = false;
       });
     } catch (error) {
       debugPrint('Error al cargar los libros subidos: $error');
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
@@ -70,6 +107,7 @@ class ProfileScreenState extends State<ProfileScreen> {
           .map((achievement) => achievement['achievement_id'])
           .toSet();
 
+      if (!mounted) return;
       setState(() {
         achievements = allAchievements.map((achievement) {
           return {
@@ -80,20 +118,16 @@ class ProfileScreenState extends State<ProfileScreen> {
             'completed': completedIds.contains(achievement['id']),
           };
         }).toList();
-        isLoading = false;
       });
     } catch (error) {
       debugPrint('Error al obtener logros: $error');
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeNotifier = Provider.of<ThemeNotifier>(context);
-    final authNotifier = Provider.of<AuthNotifier>(context);
+    final themeNotifier = app_provider.Provider.of<ThemeNotifier>(context);
+    final authNotifier = app_provider.Provider.of<AuthNotifier>(context);
 
     if (!authNotifier.isLoggedIn) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -117,10 +151,18 @@ class ProfileScreenState extends State<ProfileScreen> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-              setState(() {
-                AppColors.toggleTheme(themeNotifier.isDarkMode);
+              ).then((value) {
+                if (mounted) {
+                  fetchUserData();
+                  fetchUploadedBooks();
+                }
               });
+
+              if (mounted) {
+                setState(() {
+                  AppColors.toggleTheme(themeNotifier.isDarkMode);
+                });
+              }
             },
           ),
         ],
@@ -133,10 +175,12 @@ class ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  radius: 40,
-                  backgroundColor: AppColors.shadow,
-                  child: Icon(Icons.person,
-                      size: 40, color: AppColors.textPrimary),
+                  radius: 60,
+                  backgroundImage:
+                      avatarUrl != null ? NetworkImage(avatarUrl!) : null,
+                  child: avatarUrl == null
+                      ? Icon(Icons.person, size: 50, color: AppColors.textPrimary)
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -144,13 +188,22 @@ class ProfileScreenState extends State<ProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        nickname,
+                        name,
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                         ),
                       ),
+                      const SizedBox(height: 5),
+                      Text(
+                        '@$nickname',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                       Text(
                         'Nivel ${totalXp ~/ 1000} - Lector Ávido',
                         style: TextStyle(color: AppColors.textPrimary),
@@ -180,7 +233,11 @@ class ProfileScreenState extends State<ProfileScreen> {
                             MaterialPageRoute(
                               builder: (context) => EditProfileScreen(),
                             ),
-                          );
+                          ).then((value) {
+                            if (value == true) {
+                              fetchUserData(); // Recarga los datos al regresar
+                            }
+                          });
                         },
                         child: Text(
                           "Editar perfil",
@@ -216,154 +273,151 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildBooksGrid() {
-  return Padding(
-    padding: const EdgeInsets.all(8.0),
-    child: GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 8.0,
-        crossAxisSpacing: 8.0,
-        childAspectRatio: 1.0,
-      ),
-      itemCount: uploadedBooks.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return GestureDetector(
-            onTap: () async {
-              final shouldUpdate = await showDialog<bool>(
-                context: context,
-                builder: (BuildContext context) => const AddBookDialog(),
-              );
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 8.0,
+          crossAxisSpacing: 8.0,
+          childAspectRatio: 1.0,
+        ),
+        itemCount: uploadedBooks.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return GestureDetector(
+              onTap: () async {
+                final bool? shouldUpdate = await showDialog<bool>(
+                  context: context,
+                  builder: (BuildContext context) => const AddBookDialog(),
+                );
 
-              if (shouldUpdate == true) {
-                await fetchUploadedBooks();
-              }
-            },
-            child: Card(
-              color: AppColors.cardBackground,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                if (shouldUpdate == true) {
+                  await fetchUploadedBooks();
+                  if (mounted) setState(() {});
+                }
+              },
+              child: Card(
+                color: AppColors.cardBackground,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 3,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add, color: AppColors.iconSelected, size: 36),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Agregar libro',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.iconSelected,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              elevation: 3,
-              child: Center(
+            );
+          } else {
+            final book = uploadedBooks[index - 1];
+            final String thumbnail = _determineThumbnail(book);
+
+            return GestureDetector(
+              onTap: () async {
+                final bool? shouldUpdate = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => BookDetailsScreen(
+                      bookId: book.id,
+                      onDelete: (deletedBookId) {
+                        setState(() {
+                          uploadedBooks.removeWhere((b) => b.id == deletedBookId);
+                        });
+                      },
+                    ),
+                  ),
+                );
+
+                if (shouldUpdate == true) {
+                  await fetchUploadedBooks();
+                  if (mounted) setState(() {});
+                }
+              },
+              child: Card(
+                color: AppColors.cardBackground,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 3,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.add, color: AppColors.iconSelected, size: 36),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Agregar libro',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.iconSelected,
+                    Container(
+                      height: 100,
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(10),
+                          topRight: Radius.circular(10),
+                        ),
+                        image: DecorationImage(
+                          image: NetworkImage(thumbnail),
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        book.title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text(
+                        book.author,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),
-            ),
-          );
-        } else {
-          final book = uploadedBooks[index - 1];
-          final String thumbnail = _determineThumbnail(book);
-
-          return GestureDetector(
-            onTap: () async {
-              final shouldUpdate = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => BookDetailsScreen(
-                    bookId: book.id,
-                    onDelete: (deletedBookId) {
-                      setState(() {
-                        uploadedBooks.removeWhere((b) => b.id == deletedBookId);
-                      });
-                    },
-                  ),
-                ),
-              );
-
-              if (shouldUpdate == true) {
-                await fetchUploadedBooks();
-              }
-            },
-            child: Card(
-              color: AppColors.cardBackground,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              elevation: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Imagen principal del libro
-                  Container(
-                    height: 100,
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(10),
-                        topRight: Radius.circular(10),
-                      ),
-                      image: DecorationImage(
-                        image: NetworkImage(thumbnail),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      book.title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Text(
-                      book.author,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-          );
-        }
-      },
-    ),
-  );
-}
-
-String _determineThumbnail(Book book) {
-  // Si hay imágenes subidas manualmente, usa la primera de ellas
-  if (book.photos != null && book.photos!.isNotEmpty) {
-    return _sanitizeImageUrl(book.photos!.first);
+            );
+          }
+        },
+      ),
+    );
   }
 
-  // Si no hay imágenes subidas manualmente, usa el thumbnail de la API
-  return _sanitizeImageUrl(book.thumbnail);
-}
-
-String _sanitizeImageUrl(String url) {
-  if (url.contains('/books/books/')) {
-    return url.replaceAll('/books/books/', '/books/');
+  String _determineThumbnail(Book book) {
+    if (book.photos != null && book.photos!.isNotEmpty) {
+      return _sanitizeImageUrl(book.photos!.first);
+    }
+    return _sanitizeImageUrl(book.thumbnail);
   }
-  return url;
-}
 
+  String _sanitizeImageUrl(String url) {
+    if (url.contains('/books/books/')) {
+      return url.replaceAll('/books/books/', '/books/');
+    }
+    return url;
+  }
 
   Widget _buildAchievementsList() {
     return ListView.builder(
@@ -412,6 +466,7 @@ String _sanitizeImageUrl(String url) {
     return Expanded(
       child: GestureDetector(
         onTap: () {
+          if (!mounted) return;
           setState(() {
             _selectedTabIndex = index;
           });
@@ -440,5 +495,14 @@ String _sanitizeImageUrl(String url) {
         ),
       ),
     );
+  }
+
+  void _handleManualAddResult(bool? shouldUpdate) async {
+    if (shouldUpdate == true) {
+      await fetchUploadedBooks();
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 }

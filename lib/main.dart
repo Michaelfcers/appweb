@@ -11,6 +11,7 @@ import 'views/Profile/profile_logged_out_screen.dart';
 import 'views/Layout/layout.dart';
 import 'views/Home/start_page.dart';
 import 'views/Home/home_screen_logged_out.dart';
+import 'views/Login/login_screen.dart'; // Importa tu pantalla de login
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +54,7 @@ class MyApp extends StatelessWidget {
         '/homeLoggedOut': (context) => const HomeScreenLoggedOut(),
         '/search': (context) => const LayoutWrapper(index: 1),
         '/profile': (context) => const LayoutWrapper(index: 2),
+        '/login': (context) => const LoginScreen(), // Nueva ruta para login
       },
     );
   }

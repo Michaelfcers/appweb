@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../Books/add_book_manual_screen.dart';
 import '../../models/book_model.dart';
 import '../../services/google_books_service.dart';
+import '../../services/user_service.dart';
 import '../../styles/colors.dart';
+import '../Books/add_book_manual_screen.dart';
 
 class AddBookDialog extends StatefulWidget {
   const AddBookDialog({super.key});
@@ -15,7 +16,7 @@ class AddBookDialog extends StatefulWidget {
 
 class _AddBookDialogState extends State<AddBookDialog> {
   final GoogleBooksService _googleBooksService = GoogleBooksService();
-  
+  final UserService _userService = UserService();
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _authorController = TextEditingController();
@@ -25,6 +26,9 @@ class _AddBookDialogState extends State<AddBookDialog> {
 
   String? _thumbnailUrl;
   bool _isLoading = false;
+  bool _titleError = false;
+  bool _conditionError = false;
+  bool _imageError = false;
   final List<Book> _searchResults = [];
   final List<File> _uploadedPhotos = [];
 
@@ -57,10 +61,59 @@ class _AddBookDialogState extends State<AddBookDialog> {
         _searchResults.addAll(books);
       });
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al buscar libros: $e')),
+      _showErrorDialog('Error al buscar libros. Por favor, intenta nuevamente.');
+    }
+  }
+
+  Future<void> _addBookToUser() async {
+    setState(() {
+      _titleError = _titleController.text.trim().isEmpty;
+      _conditionError = _conditionController.text.trim().isEmpty;
+      _imageError = _uploadedPhotos.isEmpty;
+    });
+
+    if (_titleError || _conditionError || _imageError) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      List<String> uploadedUrls = [];
+      for (int i = 0; i < _uploadedPhotos.length; i++) {
+        final imageUrl = await _userService.uploadImageToStorage(
+          _uploadedPhotos[i].path,
+          'image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
+        );
+        uploadedUrls.add(imageUrl);
+      }
+
+      if (uploadedUrls.isEmpty) {
+        throw Exception('Error al subir imágenes. Intenta nuevamente.');
+      }
+
+      _thumbnailUrl = uploadedUrls.first;
+
+      await _userService.addBookToUser(
+        title: _titleController.text.trim(),
+        author: _authorController.text.trim(),
+        genre: _genreController.text.trim(),
+        description: _descriptionController.text.trim(),
+        condition: _conditionController.text.trim(),
+        photos: uploadedUrls,
+        thumbnail: _thumbnailUrl!,
       );
+
+      if (!mounted) return;
+
+      _showSuccessDialog();
+    } catch (e) {
+      _showErrorDialog(
+          'Ocurrió un error al agregar el libro. Por favor, intenta nuevamente.');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -71,16 +124,120 @@ class _AddBookDialogState extends State<AddBookDialog> {
     if (images != null) {
       setState(() {
         _uploadedPhotos.addAll(images.map((img) => File(img.path)));
+        _imageError = false;
       });
     }
   }
 
-  void _navigateToManualAdd() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const AddBookManualScreen()),
+  void _showSuccessDialog() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 60),
+            const SizedBox(height: 10),
+            const Text(
+              'Éxito',
+              style: TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        content: const Text(
+          'El libro se guardó con éxito.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.iconSelected,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(context); // Cierra el diálogo
+                Navigator.pop(context, true); // Notifica que el libro se agregó
+              },
+              child: const Text('Aceptar'),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, color: Colors.red, size: 60),
+              const SizedBox(height: 10),
+              const Text(
+                'Error',
+                style: TextStyle(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            Center(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text('Aceptar'),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
+
+  void _navigateToManualAdd() async {
+  // Navega a la pantalla de agregar libro manual
+  final bool? shouldUpdate = await Navigator.push<bool>(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const AddBookManualScreen(),
+    ),
+  );
+
+  // Cierra el diálogo actual y notifica al perfil
+  if (mounted && shouldUpdate == true) {
+    Navigator.pop(context, true); // Devuelve `true` a ProfileScreen
+  }
+}
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -97,32 +254,57 @@ class _AddBookDialogState extends State<AddBookDialog> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _buildThumbnail(),
-            const SizedBox(height: 24),
-            _buildTitleAutocomplete(),
-            const SizedBox(height: 10),
-            _buildReadOnlyField(_authorController, 'Autor'),
-            const SizedBox(height: 10),
-            _buildReadOnlyField(_genreController, 'Género'),
-            const SizedBox(height: 10),
-            _buildTextField(_descriptionController, 'Descripción / Sinopsis'),
-            const SizedBox(height: 10),
-            _buildTextField(_conditionController, 'Condición'),
-            const SizedBox(height: 10),
-            _buildPhotoPicker(),
-            const SizedBox(height: 24),
-            _buildSubmitButton(),
-            const SizedBox(height: 24),
-            Divider(color: AppColors.iconSelected.withOpacity(0.5)),
-            const SizedBox(height: 16),
-            _buildManualAddOption(),
-          ],
-        ),
+      body: Stack(
+        children: [
+          AbsorbPointer(
+            absorbing: _isLoading,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _buildThumbnail(),
+                  const SizedBox(height: 24),
+                  _buildTitleAutocomplete(),
+                  if (_titleError)
+                    Text('El título es obligatorio',
+                        style: TextStyle(color: Colors.red)),
+                  const SizedBox(height: 10),
+                  _buildReadOnlyField(_authorController, 'Autor'),
+                  const SizedBox(height: 10),
+                  _buildReadOnlyField(_genreController, 'Género'),
+                  const SizedBox(height: 10),
+                  _buildTextField(_descriptionController, 'Descripción / Sinopsis'),
+                  const SizedBox(height: 10),
+                  _buildTextField(_conditionController, 'Condición'),
+                  if (_conditionError)
+                    Text('Este campo es obligatorio',
+                        style: TextStyle(color: Colors.red)),
+                  const SizedBox(height: 10),
+                  _buildPhotoPicker(),
+                  if (_imageError)
+                    Text('Sube al menos una imagen',
+                        style: TextStyle(color: Colors.red)),
+                  const SizedBox(height: 24),
+                  _buildSubmitButton(),
+                  const SizedBox(height: 24),
+                  Divider(color: AppColors.iconSelected.withOpacity(0.5)),
+                  const SizedBox(height: 16),
+                  _buildManualAddOption(),
+                ],
+              ),
+            ),
+          ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -135,10 +317,13 @@ class _AddBookDialogState extends State<AddBookDialog> {
         color: AppColors.shadow,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: _thumbnailUrl != null
+      child: _uploadedPhotos.isNotEmpty
           ? ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(_thumbnailUrl!, fit: BoxFit.cover),
+              child: Image.file(
+                _uploadedPhotos.first,
+                fit: BoxFit.cover,
+              ),
             )
           : Center(
               child: Icon(
@@ -150,35 +335,6 @@ class _AddBookDialogState extends State<AddBookDialog> {
     );
   }
 
-  Widget _buildManualAddOption() {
-    return Column(
-      children: [
-        Text(
-          "¿No encuentras tu libro?",
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
-        ElevatedButton.icon(
-          onPressed: _navigateToManualAdd,
-          icon: const Icon(Icons.add_circle_outline),
-          label: const Text("Agregar Manualmente"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.iconSelected,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildPhotoPicker() {
     return Column(
       children: [
@@ -186,24 +342,51 @@ class _AddBookDialogState extends State<AddBookDialog> {
           onPressed: _pickImages,
           icon: const Icon(Icons.upload_file),
           label: const Text("Subir Imágenes"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.iconSelected,
+          ),
         ),
-        Wrap(
-          spacing: 8.0,
-          runSpacing: 4.0,
-          children: _uploadedPhotos
-              .map((photo) => ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      photo,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                    ),
-                  ))
-              .toList(),
-        ),
+        if (_uploadedPhotos.isNotEmpty)
+          ReorderableListView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            onReorder: _reorderImages,
+            children: _uploadedPhotos
+                .map((photo) => ListTile(
+                      key: ValueKey(photo),
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          photo,
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      title: const Text("Arrastra para cambiar portada"),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            _uploadedPhotos.remove(photo);
+                          });
+                        },
+                      ),
+                    ))
+                .toList(),
+          ),
       ],
     );
+  }
+
+  void _reorderImages(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) {
+        newIndex -= 1;
+      }
+      final File movedImage = _uploadedPhotos.removeAt(oldIndex);
+      _uploadedPhotos.insert(newIndex, movedImage);
+    });
   }
 
   Widget _buildSubmitButton() {
@@ -215,7 +398,7 @@ class _AddBookDialogState extends State<AddBookDialog> {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
-      onPressed: _isLoading ? null : () {}, // Agregar la lógica de envío
+      onPressed: _isLoading ? null : _addBookToUser,
       child: _isLoading
           ? const CircularProgressIndicator(color: Colors.white)
           : Text(
@@ -244,6 +427,9 @@ class _AddBookDialogState extends State<AddBookDialog> {
           controller: controller,
           focusNode: focusNode,
           onChanged: (value) {
+            setState(() {
+              _titleError = false;
+            });
             _searchBooks(value);
           },
           decoration: InputDecoration(
@@ -283,6 +469,11 @@ class _AddBookDialogState extends State<AddBookDialog> {
   Widget _buildTextField(TextEditingController controller, String label) {
     return TextField(
       controller: controller,
+      onChanged: (value) {
+        setState(() {
+          if (label == 'Condición') _conditionError = false;
+        });
+      },
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: AppColors.iconSelected),
@@ -294,6 +485,35 @@ class _AddBookDialogState extends State<AddBookDialog> {
         ),
       ),
       style: const TextStyle(color: Colors.black),
+    );
+  }
+
+  Widget _buildManualAddOption() {
+    return Column(
+      children: [
+        Text(
+          "¿No encuentras tu libro?",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        ElevatedButton.icon(
+          onPressed: _navigateToManualAdd,
+          icon: const Icon(Icons.add_circle_outline),
+          label: const Text("Agregar Manualmente"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.iconSelected,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

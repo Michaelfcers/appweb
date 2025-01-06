@@ -23,54 +23,76 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
   final List<File> _uploadedPhotos = [];
   bool _isLoading = false;
 
+  // Control de errores para cada campo
+  bool _titleError = false;
+  bool _authorError = false;
+  bool _genreError = false;
+  bool _descriptionError = false;
+  bool _conditionError = false;
+  bool _imageError = false;
+
   Future<void> _addManualBook() async {
-  try {
-    if (_titleController.text.trim().isEmpty ||
-        _conditionController.text.trim().isEmpty ||
-        _uploadedPhotos.isEmpty) {
-      throw Exception(
-          'Por favor, completa todos los campos obligatorios y sube al menos una imagen.');
-    }
+    // Validación de los campos obligatorios
+    setState(() {
+      _titleError = _titleController.text.trim().isEmpty;
+      _authorError = _authorController.text.trim().isEmpty;
+      _genreError = _genreController.text.trim().isEmpty;
+      _descriptionError = _descriptionController.text.trim().isEmpty;
+      _conditionError = _conditionController.text.trim().isEmpty;
+      _imageError = _uploadedPhotos.isEmpty;
+    });
 
-    // Subir imágenes a Supabase y obtener las URLs públicas
-    List<String> uploadedUrls = [];
-    for (int i = 0; i < _uploadedPhotos.length; i++) {
-      final imageUrl = await _userService.uploadImageToStorage(
-        _uploadedPhotos[i].path,
-        'image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
+    if (_titleError ||
+        _authorError ||
+        _genreError ||
+        _descriptionError ||
+        _conditionError ||
+        _imageError) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      List<String> uploadedUrls = [];
+      for (int i = 0; i < _uploadedPhotos.length; i++) {
+        final imageUrl = await _userService.uploadImageToStorage(
+          _uploadedPhotos[i].path,
+          'image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
+        );
+        uploadedUrls.add(imageUrl);
+      }
+
+      if (uploadedUrls.isEmpty) {
+        throw Exception('Error al subir imágenes. Intenta nuevamente.');
+      }
+
+      final thumbnailUrl = uploadedUrls.first;
+
+      await _userService.addBookToUser(
+        title: _titleController.text.trim(),
+        author: _authorController.text.trim(),
+        genre: _genreController.text.trim(),
+        description: _descriptionController.text.trim(),
+        condition: _conditionController.text.trim(),
+        photos: uploadedUrls,
+        thumbnail: thumbnailUrl,
       );
-      uploadedUrls.add(imageUrl);
+
+      if (!mounted) return;
+
+      _showSuccessDialog();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al agregar el libro: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
-
-    if (uploadedUrls.isEmpty) {
-      throw Exception('Error al subir imágenes. Intenta nuevamente.');
-    }
-
-    // Usar la primera URL como portada
-    final thumbnailUrl = uploadedUrls.first;
-
-    // Guardar libro en Supabase
-    await _userService.addBookToUser(
-      title: _titleController.text.trim(),
-      author: _authorController.text.trim(),
-      genre: _genreController.text.trim(),
-      description: _descriptionController.text.trim(),
-      condition: _conditionController.text.trim(),
-      photos: uploadedUrls,
-      thumbnail: thumbnailUrl,
-    );
-
-    if (!mounted) return;
-
-    _showSuccessDialog(); // Mostrar diálogo de éxito
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error al agregar el libro: $e')),
-    );
   }
-}
-
 
   Future<void> _pickImages() async {
     final ImagePicker picker = ImagePicker();
@@ -79,6 +101,7 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
     if (images != null) {
       setState(() {
         _uploadedPhotos.addAll(images.map((img) => File(img.path)));
+        _imageError = false;
       });
     }
   }
@@ -108,28 +131,65 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _buildThumbnail(),
-            const SizedBox(height: 24),
-            _buildTextField(_titleController, 'Título'),
-            const SizedBox(height: 10),
-            _buildTextField(_authorController, 'Autor'),
-            const SizedBox(height: 10),
-            _buildTextField(_genreController, 'Género'),
-            const SizedBox(height: 10),
-            _buildTextField(_descriptionController, 'Descripción / Sinopsis'),
-            const SizedBox(height: 10),
-            _buildTextField(_conditionController, 'Condición'),
-            const SizedBox(height: 10),
-            _buildPhotoPicker(),
-            const SizedBox(height: 24),
-            _buildSubmitButton(),
-          ],
-        ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildThumbnail(),
+                const SizedBox(height: 24),
+                _buildTextField(_titleController, 'Título', _titleError),
+                const SizedBox(height: 10),
+                _buildTextField(_authorController, 'Autor', _authorError),
+                const SizedBox(height: 10),
+                _buildTextField(_genreController, 'Género', _genreError),
+                const SizedBox(height: 10),
+                _buildTextField(
+                    _descriptionController, 'Descripción / Sinopsis', _descriptionError),
+                const SizedBox(height: 10),
+                _buildTextField(_conditionController, 'Condición', _conditionError),
+                const SizedBox(height: 10),
+                _buildPhotoPicker(),
+                if (_imageError)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      'Sube al menos una imagen',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+                _buildSubmitButton(),
+              ],
+            ),
+          ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(
+                      color: AppColors.primary,
+                      strokeWidth: 4,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Guardando libro...",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -223,66 +283,91 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: AppColors.iconSelected),
-        filled: true,
-        fillColor: AppColors.cardBackground,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.iconSelected),
+  Widget _buildTextField(
+      TextEditingController controller, String label, bool hasError) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: controller,
+          onChanged: (value) {
+            setState(() {
+              if (label == 'Título') _titleError = false;
+              if (label == 'Autor') _authorError = false;
+              if (label == 'Género') _genreError = false;
+              if (label == 'Descripción / Sinopsis') _descriptionError = false;
+              if (label == 'Condición') _conditionError = false;
+            });
+          },
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle: TextStyle(color: AppColors.iconSelected),
+            filled: true,
+            fillColor: AppColors.cardBackground,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.iconSelected),
+            ),
+          ),
+          style: const TextStyle(color: Colors.black),
         ),
-      ),
-      style: const TextStyle(color: Colors.black),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(
+              'Este campo es obligatorio',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+      ],
     );
   }
 
   void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 60),
-              const SizedBox(height: 10),
-              const Text(
-                'Éxito',
-                style: TextStyle(fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          content: const Text(
-            'El libro se guardó con éxito.',
-            textAlign: TextAlign.center,
-          ),
-          actions: [
-            Center(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.iconSelected,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(context); // Cierra el diálogo
-                  Navigator.pop(context, true); // Regresa al flujo principal
-                },
-                child: const Text('Aceptar'),
-              ),
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 60),
+            const SizedBox(height: 10),
+            const Text(
+              'Éxito',
+              style: TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
           ],
-        );
-      },
-    );
-  }
+        ),
+        content: const Text(
+          'El libro se guardó con éxito.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.iconSelected,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(context); // Cierra el diálogo
+                Navigator.pop(context, true); // Devuelve `true` a AddBookDialog
+              },
+              child: const Text('Aceptar'),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+
 }
