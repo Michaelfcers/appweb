@@ -5,8 +5,9 @@ class TradeProposalDialog extends StatelessWidget {
   final String proposerNickname;
   final String proposerName;
   final String barterId;
-  final List<Map<String, dynamic>> books;
-  final String status; // Estado actual del trueque
+  final List<Map<String, dynamic>> books; // Libros ofrecidos
+  final Map<String, dynamic>? targetBook; // Libro objetivo (puede ser nulo)
+  final String status; // Estado del trueque
 
   const TradeProposalDialog({
     super.key,
@@ -14,6 +15,7 @@ class TradeProposalDialog extends StatelessWidget {
     required this.proposerName,
     required this.barterId,
     required this.books,
+    this.targetBook, // Asegúrate de aceptar este parámetro
     required this.status,
   });
 
@@ -38,6 +40,46 @@ class TradeProposalDialog extends StatelessWidget {
             ),
             const SizedBox(height: 15),
             const Text(
+              'Libro objetivo:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 10),
+            targetBook != null
+                ? ListTile(
+                    title: Text(
+                      targetBook!['title'] ?? 'Título no disponible',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      targetBook!['author'] ?? 'Autor no disponible',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    leading: targetBook!['cover_url'] != null &&
+                            (targetBook!['cover_url'] as String).isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              targetBook!['cover_url'] ?? '',
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(
+                                  Icons.broken_image,
+                                  size: 50,
+                                  color: Colors.grey,
+                                );
+                              },
+                            ),
+                          )
+                        : const Icon(Icons.book, size: 50),
+                  )
+                : const Text(
+                    'No se pudo encontrar el libro objetivo.',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+            const SizedBox(height: 15),
+            const Text(
               'Libros ofrecidos:',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
@@ -54,12 +96,23 @@ class TradeProposalDialog extends StatelessWidget {
                           book['author'] ?? 'Autor no disponible',
                           style: const TextStyle(fontSize: 12),
                         ),
-                        leading: book['cover_url'] != null
-                            ? Image.network(
-                                book['cover_url'],
-                                width: 50,
-                                height: 50,
-                                fit: BoxFit.cover,
+                        leading: book['cover_url'] != null &&
+                                (book['cover_url'] as String).isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  book['cover_url'] ?? '',
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(
+                                      Icons.broken_image,
+                                      size: 50,
+                                      color: Colors.grey,
+                                    );
+                                  },
+                                ),
                               )
                             : const Icon(Icons.book, size: 50),
                       );
@@ -92,8 +145,8 @@ class TradeProposalDialog extends StatelessWidget {
           ),
           onPressed: isDecisionMade
               ? null
-              : () {
-                  _respondToProposal(context, barterId, 'accepted');
+              : () async {
+                  await _respondToProposal(context, barterId, 'accepted');
                 },
           child: const Text('Aceptar Trueque'),
         ),
@@ -103,8 +156,8 @@ class TradeProposalDialog extends StatelessWidget {
           ),
           onPressed: isDecisionMade
               ? null
-              : () {
-                  _respondToProposal(context, barterId, 'rejected');
+              : () async {
+                  await _respondToProposal(context, barterId, 'rejected');
                 },
           child: const Text('Rechazar Trueque'),
         ),
@@ -112,43 +165,87 @@ class TradeProposalDialog extends StatelessWidget {
     );
   }
 
-  void _respondToProposal(BuildContext context, String barterId, String response) async {
-    try {
-      final supabase = Supabase.instance.client;
+  Future<void> _respondToProposal(
+    BuildContext context, String barterId, String response) async {
+  try {
+    final supabase = Supabase.instance.client;
 
-      await supabase.from('barters').update({'status': response}).eq('id', barterId);
+    // Actualizar el estado del trueque
+    final barter = await supabase
+        .from('barters')
+        .select('status')
+        .eq('id', barterId)
+        .single();
 
-      if (!context.mounted) return;
-
-      Navigator.of(context).pop();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            response == 'accepted' ? 'Has aceptado el trueque.' : 'Has rechazado el trueque.',
-          ),
-        ),
+    if (barter == null || barter['status'] != 'pending') {
+      _showErrorDialog(
+        context,
+        'El trueque ya no está disponible para esta acción.',
       );
-    } catch (e) {
-      if (!context.mounted) return;
-
-      _showErrorDialog(context, 'Error al procesar la respuesta al trueque.');
+      return;
     }
+
+    await supabase
+        .from('barters')
+        .update({'status': response})
+        .eq('id', barterId);
+
+    if (response == 'accepted') {
+  // Bloquear libros ofrecidos por el proponente
+}
+
+
+    // Enviar notificación al proponente
+    final proposerId = (await supabase
+        .from('barters')
+        .select('proposer_id')
+        .eq('id', barterId)
+        .single())['proposer_id'];
+
+    await supabase.from('notifications').insert({
+      'user_id': proposerId,
+      'type': response == 'accepted' ? 'trade_accepted' : 'trade_rejected',
+      'content': response == 'accepted'
+          ? 'Tu propuesta de trueque ha sido aceptada.'
+          : 'Tu propuesta de trueque ha sido rechazada.',
+      'barter_id': barterId,
+    });
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).pop();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          response == 'accepted'
+              ? 'Has aceptado el trueque.'
+              : 'Has rechazado el trueque.',
+        ),
+      ),
+    );
+  } catch (e) {
+    debugPrint('Error al procesar el trueque: $e');
+    _showErrorDialog(
+        context, 'Error al procesar la respuesta al trueque: ${e.toString()}');
   }
+}
 
   void _showErrorDialog(BuildContext context, String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Error'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

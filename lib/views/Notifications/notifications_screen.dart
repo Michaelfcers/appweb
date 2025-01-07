@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../styles/colors.dart';
 import 'trade_proposal_dialog.dart';
 import '../../services/user_service.dart';
+import '../Notifications/trade_status_dialog.dart';
+
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -99,36 +101,62 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _openTradeProposalDialog(Map<String, dynamic> notification) async {
-    debugPrint('Intentando abrir el diálogo para la notificación: $notification');
-
-    if (notification['barter_id'] == null) {
-      debugPrint('El barter_id es nulo o no válido.');
-      _showErrorDialog(context, 'No se pudo cargar los detalles del trueque.');
-      return;
-    }
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
 
     try {
       final tradeDetails = await _userService.fetchTradeDetails(notification['id']);
-      debugPrint('Detalles obtenidos: $tradeDetails');
+      Navigator.of(context).pop(); // Cierra el indicador de carga
 
+      debugPrint('Detalles obtenidos: $tradeDetails');
       if (!mounted) return;
 
       final books = List<Map<String, dynamic>>.from(tradeDetails['books']);
       final barterStatus = tradeDetails['barter']['status'];
+      final proposerName = tradeDetails['proposer']['name'];
+      final proposerNickname = tradeDetails['proposer']['nickname'];
+      final targetBook = tradeDetails['targetBook'];
 
-      showDialog(
-        context: context,
-        builder: (context) => TradeProposalDialog(
-          proposerNickname: tradeDetails['proposer']['nickname'],
-          proposerName: tradeDetails['proposer']['name'],
-          barterId: tradeDetails['barter']['id'],
-          books: books,
-          status: barterStatus,
-        ),
-      );
+
+      if (notification['type'] == 'trade_request') {
+        // Mostrar el diálogo de propuesta
+        showDialog(
+          context: context,
+          builder: (context) => TradeProposalDialog(
+            proposerNickname: proposerNickname,
+            proposerName: proposerName,
+            barterId: tradeDetails['barter']['id'],
+            books: books,
+            targetBook: targetBook, // Pasa el libro objetivo
+            status: barterStatus,
+          ),
+        );
+      } else {
+        // Mostrar el diálogo para 'trade_accepted' o 'trade_rejected'
+        final String statusMessage = notification['type'] == 'trade_accepted'
+            ? 'Tu propuesta de trueque ha sido aceptada.'
+            : 'Tu propuesta de trueque ha sido rechazada.';
+
+        showDialog(
+          context: context,
+          builder: (context) => TradeStatusDialog(
+            proposerNickname: proposerNickname,
+            proposerName: proposerName,
+            books: books,
+            targetBook: targetBook,
+            statusMessage: statusMessage,
+          ),
+        );
+      }
     } catch (e) {
+      Navigator.of(context).pop(); // Cierra el indicador de carga en caso de error
       debugPrint('Error al abrir el diálogo: $e');
-      _showErrorDialog(context, 'No se pudo abrir la propuesta.');
+      _showErrorDialog(context, 'No se pudo abrir los detalles del trueque.');
     }
   }
 
@@ -215,14 +243,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   title: _getTitleForType(notification['type']),
                   subtitle: notification['content'] ?? '',
                   isRead: notification['read'],
+                  type: notification['type'], // Pasar el tipo aquí
                   onTap: () {
                     debugPrint('Notificación seleccionada: $notification');
                     if (!notification['read']) {
                       _markAsRead(notification['id']);
                     }
-                    if (notification['type'] == 'trade_request') {
-                      _openTradeProposalDialog(notification);
-                    }
+                    _openTradeProposalDialog(notification);
                   },
                 );
               },
@@ -236,6 +263,7 @@ class NotificationCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool isRead;
+  final String type; // Nuevo: para determinar el tipo
   final VoidCallback onTap;
 
   const NotificationCard({
@@ -244,48 +272,56 @@ class NotificationCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.isRead,
+    required this.type, // Pasamos el tipo
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Si la notificación está leída, usamos line-through y un color más apagado.
-    final titleStyle = TextStyle(
-      fontSize: 18,
-      fontWeight: FontWeight.bold,
-      color: isRead ? Colors.black54 : Colors.black,
-      decoration: isRead ? TextDecoration.lineThrough : null,
-    );
+    // Determinar color de fondo según el estado y tipo
+    Color backgroundColor;
+    if (type == 'trade_accepted') {
+      backgroundColor = Colors.green[100]!;
+    } else if (type == 'trade_rejected') {
+      backgroundColor = Colors.red[100]!;
+    } else {
+      backgroundColor = isRead ? Colors.grey[200]! : Colors.white;
+    }
+
+    // Determinar color del borde
+    Color borderColor = isRead
+        ? Colors.grey
+        : (type == 'trade_accepted'
+            ? Colors.green
+            : (type == 'trade_rejected' ? Colors.red : Colors.blue));
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
         border: Border.all(
-          color: isRead ? AppColors.divider : AppColors.primary,
+          color: borderColor,
           width: 1.5,
         ),
       ),
       child: ListTile(
         leading: Icon(
           icon,
-          color: isRead ? AppColors.textSecondary : AppColors.iconSelected,
+          color: isRead ? Colors.grey : borderColor,
           size: 30,
         ),
-        title: Text(title, style: titleStyle),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isRead ? Colors.grey[700] : Colors.black,
+          ),
+        ),
         subtitle: Text(
           subtitle,
           style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
+            color: Colors.grey[600],
           ),
         ),
         onTap: onTap,

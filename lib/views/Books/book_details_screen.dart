@@ -98,6 +98,7 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
                   MaterialPageRoute(
                     builder: (context) => TradeProposalScreen(
                       receiverId: book.userId ?? "unknown",
+                      targetBookId: book.id, // Enviar el ID del libro objetivo
                     ),
                   ),
                 );
@@ -113,7 +114,6 @@ class _BookDetailsScreenState extends State<BookDetailsScreen> {
       ),
     );
   }
-
   Widget _buildUserCard(Book book) {
     return GestureDetector(
       onTap: book.userId == null

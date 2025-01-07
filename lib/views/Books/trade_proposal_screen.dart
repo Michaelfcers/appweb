@@ -5,8 +5,13 @@ import '../../styles/colors.dart';
 
 class TradeProposalScreen extends StatefulWidget {
   final String receiverId;
+  final String targetBookId; // ID del libro objetivo, enviado desde la pantalla previa.
 
-  const TradeProposalScreen({super.key, required this.receiverId});
+  const TradeProposalScreen({
+    super.key,
+    required this.receiverId,
+    required this.targetBookId,
+  });
 
   @override
   TradeProposalScreenState createState() => TradeProposalScreenState();
@@ -80,84 +85,93 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
   }
 
   Future<void> proposeTrade() async {
-    if (selectedBooks.isEmpty) return;
+  if (selectedBooks.isEmpty) return;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.cardBackground,
-          title: Text(
-            'Confirmar Propuesta',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.textPrimary),
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: Text(
+          'Confirmar Propuesta',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          '¿Estás seguro que deseas proponer el trueque con los libros seleccionados?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancelar', style: TextStyle(color: AppColors.iconSelected)),
           ),
-          content: Text(
-            '¿Estás seguro que deseas proponer el trueque con los libros seleccionados?',
-            style: TextStyle(color: AppColors.textSecondary),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.iconSelected,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Confirmar', style: TextStyle(color: AppColors.cardBackground)),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancelar', style: TextStyle(color: AppColors.iconSelected)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.iconSelected,
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Confirmar', style: TextStyle(color: AppColors.cardBackground)),
-            ),
-          ],
-        );
-      },
+        ],
+      );
+    },
+  );
+
+  if (confirm != true) return;
+
+  try {
+    final String? proposerId = userService.getCurrentUserId();
+
+    if (proposerId == null) {
+      throw Exception("Usuario no autenticado.");
+    }
+
+    // Aquí colocamos el debugPrint
+    debugPrint('Datos enviados:');
+    debugPrint('Proposer ID: $proposerId');
+    debugPrint('Receiver ID: ${widget.receiverId}');
+    debugPrint('Target Book ID: ${widget.targetBookId}');
+    debugPrint('Selected Books: ${selectedBooks.map((b) => b.id).toList()}');
+
+    final String barterId = await userService.createBarter(
+      proposerId: proposerId,
+      receiverId: widget.receiverId,
+      targetBookId: widget.targetBookId, // Pasar el libro objetivo automáticamente
     );
 
-    if (confirm != true) return;
-
-    try {
-      final String? proposerId = userService.getCurrentUserId();
-
-      if (proposerId == null) {
-        throw Exception("Usuario no autenticado.");
-      }
-
-      final String barterId = await userService.createBarter(
-        proposerId: proposerId,
-        receiverId: widget.receiverId,
-      );
-
-      for (final book in selectedBooks) {
-        await userService.addBarterDetail(
-          barterId: barterId,
-          bookId: book.id,
-          offeredBy: proposerId,
-        );
-      }
-
-      await userService.notifyUser(
-        receiverId: widget.receiverId,
-        content: 'Tienes una nueva propuesta de trueque.',
-        type: 'trade_request',
+    for (final book in selectedBooks) {
+      await userService.addBarterDetail(
         barterId: barterId,
-      );
-
-      if (!mounted) return;
-      showSuccessDialog();
-    } catch (e) {
-      debugPrint('Error al proponer el trueque: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Error al enviar la propuesta: ${e.toString()}',
-            style: const TextStyle(color: Colors.white),
-          ),
-          backgroundColor: Colors.red,
-        ),
+        bookId: book.id,
+        offeredBy: proposerId,
       );
     }
+
+    await userService.notifyUser(
+      receiverId: widget.receiverId,
+      content: 'Tienes una nueva propuesta de trueque.',
+      type: 'trade_request',
+      barterId: barterId,
+    );
+
+    if (!mounted) return;
+    showSuccessDialog();
+  } catch (e) {
+    debugPrint('Error al proponer el trueque: $e');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Error al enviar la propuesta: ${e.toString()}',
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
+
 
   void showSuccessDialog() {
     showDialog(
@@ -369,31 +383,31 @@ class TradeProposalScreenState extends State<TradeProposalScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-Align(
-  alignment: Alignment.bottomCenter,
-  child: ElevatedButton(
-    style: ElevatedButton.styleFrom(
-      backgroundColor: AppColors.iconSelected, // Cambiado a iconSelected
-      padding: const EdgeInsets.symmetric(
-        horizontal: 32, 
-        vertical: 14,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-    ),
-    onPressed: selectedBooks.isEmpty ? null : proposeTrade,
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.swap_horiz, color: AppColors.cardBackground),
-        const SizedBox(width: 8),
-        Text(
-          'Proponer Trueque',
-          style: TextStyle(
-            fontSize: 16,
-            color: AppColors.cardBackground,
-            fontWeight: FontWeight.bold,
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.iconSelected,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      onPressed: selectedBooks.isEmpty ? null : proposeTrade,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.swap_horiz, color: AppColors.cardBackground),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Proponer Trueque',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: AppColors.cardBackground,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
