@@ -4,6 +4,8 @@ import '../../styles/colors.dart';
 import '../../styles/theme_notifier.dart';
 import '../../auth_notifier.dart';
 import '../Settings/politicas.dart'; // Importa la pantalla de políticas
+import '../Login/recovery_password_screen.dart'; // Importa la pantalla de cambio de contraseña
+import '../trade_management/trade_management_screen.dart'; // Importa la pantalla de gestión de trueques
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -32,6 +34,7 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
+          // Switch para el modo oscuro
           SwitchListTile(
             activeColor: AppColors.iconSelected,
             contentPadding: EdgeInsets.zero,
@@ -50,6 +53,8 @@ class SettingsScreen extends StatelessWidget {
           ),
           Divider(color: AppColors.divider),
           const SizedBox(height: 20),
+
+          // Sección de seguridad
           _buildSectionTitle("Seguridad"),
           const SizedBox(height: 10),
           _buildSettingsOption(
@@ -63,7 +68,36 @@ class SettingsScreen extends StatelessWidget {
               );
             },
           ),
+          _buildSettingsOption(
+            context,
+            icon: Icons.lock_outline,
+            title: "Cambiar contraseña",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RecoveryPasswordScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+
+          // Sección de gestión de trueques
+          _buildSectionTitle("Gestión de Trueques"),
+          const SizedBox(height: 10),
+          _buildSettingsOption(
+            context,
+            icon: Icons.swap_horiz,
+            title: "Administrar Trueques",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TradeManagementScreen()),
+              );
+            },
+          ),
           const SizedBox(height: 30),
+
+          // Botón de cerrar sesión
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.iconSelected,
@@ -149,7 +183,6 @@ class SettingsScreen extends StatelessWidget {
                 await authNotifier.logOut();
                 Navigator.of(dialogContext).pop();
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  // Navegamos a '/homeLoggedOut' que sí está definida en rutas
                   Navigator.pushNamedAndRemoveUntil(context, '/homeLoggedOut', (route) => false);
                 });
               },
