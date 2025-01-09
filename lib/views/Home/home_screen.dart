@@ -19,7 +19,6 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-
 class _HomeScreenState extends State<HomeScreen> {
   final UserService userService = UserService(); // Servicio para obtener libros
   final NotificationService notificationService = NotificationService(); // Servicio de notificaciones
@@ -33,28 +32,34 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     fetchBooks();
     fetchUnreadCounts();
-
-    // Suscripciones en tiempo real para mensajes y notificaciones
-    setupRealtimeListeners();
+    setupRealtimeListeners(); // Configura las suscripciones en tiempo real
   }
 
-  /// Configuración de listeners en tiempo real para actualizaciones de mensajes y notificaciones
+  /// Configuración de las suscripciones en tiempo real
   void setupRealtimeListeners() {
+    // Suscripción en tiempo real a nuevos mensajes
     notificationService.subscribeToMessages((message) async {
       final unreadChats = await notificationService.getUnreadChatsCount();
       if (!mounted) return;
       setState(() {
-        unreadMessagesCount = unreadChats; // Actualiza el contador de mensajes no leídos
+        unreadMessagesCount = unreadChats;
       });
     });
 
-    notificationService.subscribeToNotifications((notification) async {
+    // Suscripción en tiempo real a nuevas notificaciones
+    notificationService.subscribeToNotifications(() async {
       final unreadNotifications = await notificationService.getUnreadNotificationsCount();
       if (!mounted) return;
       setState(() {
-        unreadNotificationsCount = unreadNotifications; // Actualiza el contador de notificaciones no leídas
+        unreadNotificationsCount = unreadNotifications;
       });
     });
+  }
+
+  @override
+  void dispose() {
+    notificationService.dispose(); // Limpia las suscripciones
+    super.dispose();
   }
 
   /// Obtiene la lista de libros del servidor
@@ -372,11 +377,5 @@ class _HomeScreenState extends State<HomeScreen> {
       return url.replaceAll('/books/books/', '/books/');
     }
     return url;
-  }
-
-  @override
-  void dispose() {
-    notificationService.dispose(); // Cancelar suscripciones
-    super.dispose();
   }
 }

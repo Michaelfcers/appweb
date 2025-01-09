@@ -80,38 +80,38 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _setupRealtimeListeners() {
-    final userId = _supabase.auth.currentUser?.id;
-    if (userId == null) return;
+  final userId = _supabase.auth.currentUser?.id;
+  if (userId == null) return;
 
-    // Configura el canal Realtime para la tabla `messages`
-    _realtimeChannel = _supabase.channel('public:messages');
+  _realtimeChannel = _supabase.channel('public:messages');
 
-    _realtimeChannel.on(
-      RealtimeListenTypes.postgresChanges,
-      ChannelFilter(
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-      ),
-      (payload, [ref]) async {
-        if (payload == null || payload['new'] == null) return;
+  _realtimeChannel.on(
+    RealtimeListenTypes.postgresChanges,
+    ChannelFilter(
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages',
+      filter: 'receiver_id=eq.$userId',
+    ),
+    (payload, [ref]) async {
+      if (payload == null || payload['new'] == null) return;
 
-        final newMessage = payload['new'] as Map<String, dynamic>;
+      final newMessage = payload['new'] as Map<String, dynamic>;
 
-        // Si el mensaje pertenece a este usuario, actualiza la lista de chats
-        if (newMessage['receiver_id'] == userId) {
-          debugPrint('Nuevo mensaje recibido: $newMessage');
-          await _fetchChats();
-        }
-      },
-    );
+      if (newMessage['receiver_id'] == userId) {
+        debugPrint('Nuevo mensaje recibido: $newMessage');
+        await _fetchChats(); // Actualizar la lista de chats
+      }
+    },
+  );
 
-    try {
-      _realtimeChannel.subscribe();
-    } catch (e) {
-      debugPrint('Error al suscribirse al canal Realtime: $e');
-    }
+  try {
+    _realtimeChannel.subscribe();
+  } catch (e) {
+    debugPrint('Error al suscribirse al canal Realtime: $e');
   }
+}
+
 
   @override
   void dispose() {

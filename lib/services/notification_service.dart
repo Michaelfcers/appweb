@@ -69,34 +69,46 @@ class NotificationService {
   }
 
   /// Suscripción en tiempo real a nuevos mensajes
-  void subscribeToMessages(void Function(Map<String, dynamic>) onMessageReceived) {
-    _messagesChannel = _supabase.channel('public:messages');
+void subscribeToMessages(void Function(Map<String, dynamic>) onMessageReceived) {
+  _messagesChannel?.unsubscribe(); // Limpia el canal anterior si existe
+  _messagesChannel = _supabase.channel('public:messages');
 
-    _messagesChannel!.on(
-      RealtimeListenTypes.postgresChanges,
-      ChannelFilter(event: 'INSERT', schema: 'public', table: 'messages'),
-      (payload, [ref]) {
-        if (payload != null && payload['new'] != null) {
-          onMessageReceived(payload['new']);
-        }
-      },
-    ).subscribe();
-  }
+  _messagesChannel!.on(
+    RealtimeListenTypes.postgresChanges,
+    ChannelFilter(event: 'INSERT', schema: 'public', table: 'messages'),
+    (payload, [ref]) {
+      if (payload != null && payload['new'] != null) {
+        onMessageReceived(payload['new']);
+      }
+    },
+  ).subscribe();
+}
 
-  /// Suscripción en tiempo real a nuevas notificaciones
-  void subscribeToNotifications(void Function(Map<String, dynamic>) onNotificationReceived) {
-    _notificationsChannel = _supabase.channel('public:notifications');
+/// Suscripción en tiempo real a nuevas notificaciones
+void subscribeToNotifications(void Function() onNotificationReceived) {
+  _notificationsChannel?.unsubscribe(); // Limpia el canal anterior si existe
+  _notificationsChannel = _supabase.channel('public:notifications');
 
-    _notificationsChannel!.on(
-      RealtimeListenTypes.postgresChanges,
-      ChannelFilter(event: 'INSERT', schema: 'public', table: 'notifications'),
-      (payload, [ref]) {
-        if (payload != null && payload['new'] != null) {
-          onNotificationReceived(payload['new']);
-        }
-      },
-    ).subscribe();
-  }
+  // Suscripción al evento INSERT para la tabla notifications
+  _notificationsChannel!.on(
+    RealtimeListenTypes.postgresChanges,
+    ChannelFilter(
+      event: 'INSERT',
+      schema: 'public',
+      table: 'notifications',
+      filter: 'user_id=eq.${_supabase.auth.currentUser?.id}', // Filtrar por usuario
+    ),
+    (payload, [ref]) {
+      debugPrint('Evento recibido en notifications: $payload'); // Agrega un log
+      if (payload != null && payload['new'] != null) {
+        onNotificationReceived();
+      }
+    },
+  ).subscribe();
+}
+
+
+
 
   /// Marcar un mensaje como leído
   Future<void> markMessageAsRead(String messageId) async {

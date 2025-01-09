@@ -61,7 +61,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       table: 'notifications',
       filter: 'user_id=eq.${_supabase.auth.currentUser?.id}',
     ),
-    (payload, [ref]) {
+    (payload, [ref]) async {
       if (payload == null || payload['new'] == null) {
         debugPrint('Payload vacío o inválido.');
         return;
@@ -71,11 +71,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!mounted) return;
 
       setState(() {
-        // Agregar la nueva notificación al inicio
         notifications.insert(0, newNotification);
       });
 
-      // Mostrar mensaje emergente para la nueva notificación
+      // Mostrar mensaje emergente
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Nueva notificación: ${newNotification['content']}'),
@@ -84,14 +83,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     },
   );
 
-  // Suscribirse al canal (no asignar el resultado ya que devuelve void)
   try {
     _realtimeChannel.subscribe();
   } catch (e) {
     debugPrint('Error al suscribirse al canal de notificaciones: $e');
   }
 }
-
 
 
 
