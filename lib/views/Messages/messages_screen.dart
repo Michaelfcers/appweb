@@ -42,7 +42,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
       for (var chat in rawChats) {
         final isProposer = chat['proposer_id'] == _supabase.auth.currentUser!.id;
-        final otherUserId = isProposer ? chat['receiver_id'] : chat['proposer_id'];
+        final otherUserId =
+            isProposer ? chat['receiver_id'] : chat['proposer_id'];
 
         if (otherUserId == null) continue;
 
@@ -68,7 +69,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 message['is_read'] == false)
             .length;
 
-        entry.value['unread_count'] = unreadMessages; // Mensajes no leídos por chat
+        entry.value['unread_count'] =
+            unreadMessages; // Mensajes no leídos por chat
       }
 
       setState(() {
@@ -80,38 +82,37 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _setupRealtimeListeners() {
-  final userId = _supabase.auth.currentUser?.id;
-  if (userId == null) return;
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
 
-  _realtimeChannel = _supabase.channel('public:messages');
+    _realtimeChannel = _supabase.channel('public:messages');
 
-  _realtimeChannel.on(
-    RealtimeListenTypes.postgresChanges,
-    ChannelFilter(
-      event: 'INSERT',
-      schema: 'public',
-      table: 'messages',
-      filter: 'receiver_id=eq.$userId',
-    ),
-    (payload, [ref]) async {
-      if (payload == null || payload['new'] == null) return;
+    _realtimeChannel.on(
+      RealtimeListenTypes.postgresChanges,
+      ChannelFilter(
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: 'receiver_id=eq.$userId',
+      ),
+      (payload, [ref]) async {
+        if (payload == null || payload['new'] == null) return;
 
-      final newMessage = payload['new'] as Map<String, dynamic>;
+        final newMessage = payload['new'] as Map<String, dynamic>;
 
-      if (newMessage['receiver_id'] == userId) {
-        debugPrint('Nuevo mensaje recibido: $newMessage');
-        await _fetchChats(); // Actualizar la lista de chats
-      }
-    },
-  );
+        if (newMessage['receiver_id'] == userId) {
+          debugPrint('Nuevo mensaje recibido: $newMessage');
+          await _fetchChats(); // Actualizar la lista de chats
+        }
+      },
+    );
 
-  try {
-    _realtimeChannel.subscribe();
-  } catch (e) {
-    debugPrint('Error al suscribirse al canal Realtime: $e');
+    try {
+      _realtimeChannel.subscribe();
+    } catch (e) {
+      debugPrint('Error al suscribirse al canal Realtime: $e');
+    }
   }
-}
-
 
   @override
   void dispose() {
@@ -132,63 +133,78 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.scaffoldBackground,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        title: Text(
-          "Mensajes",
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, true); // Indica al HomeScreen que debe actualizar
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.scaffoldBackground,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          title: Text(
+            "Mensajes",
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-      ),
-      body: chats.isEmpty
-          ? Center(
-              child: Text(
-                "No tienes chats disponibles",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-              itemCount: chats.length,
-              itemBuilder: (context, index) {
-                final chat = chats[index];
-                return FutureBuilder<Map<String, dynamic>>(
-                  future: _fetchUserDetails(chat['user_id']),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final user = snapshot.data!;
-                    final lastMessage = (chat['messages'] as List).isNotEmpty
-                        ? chat['messages'].last['message']
-                        : "Sin mensajes aún";
-                    final lastTime = (chat['messages'] as List).isNotEmpty
-                        ? DateTime.parse(chat['messages'].last['created_at'])
-                        : null;
+        body: RefreshIndicator(
+          onRefresh: _fetchChats, // Permite arrastrar para refrescar
+          child: chats.isEmpty
+              ? Center(
+                  child: Text(
+                    "No tienes chats disponibles",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                  itemCount: chats.length,
+                  itemBuilder: (context, index) {
+                    final chat = chats[index];
+                    return FutureBuilder<Map<String, dynamic>>(
+                      future: _fetchUserDetails(chat['user_id']),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+                        final user = snapshot.data!;
+                        final lastMessage =
+                            (chat['messages'] as List).isNotEmpty
+                                ? chat['messages'].last['message']
+                                : "Sin mensajes aún";
+                        final lastTime =
+                            (chat['messages'] as List).isNotEmpty
+                                ? DateTime.parse(
+                                    chat['messages'].last['created_at'])
+                                : null;
 
-                    return _ChatItem(
-                      chatTitle: user['nickname'] ?? 'Usuario',
-                      lastMessage: lastMessage,
-                      time: lastTime != null
-                          ? "${lastTime.hour}:${lastTime.minute.toString().padLeft(2, '0')}"
-                          : "N/A",
-                      barterId: chat['barter_ids'].first,
-                      proposerId: chat['proposer_id'],
-                      receiverId: chat['receiver_id'],
-                      unreadCount: chat['unread_count'] ?? 0,
+                        return _ChatItem(
+                          chatTitle: user['nickname'] ?? 'Usuario',
+                          lastMessage: lastMessage,
+                          time: lastTime != null
+                              ? "${lastTime.hour}:${lastTime.minute.toString().padLeft(2, '0')}"
+                              : "N/A",
+                          barterId: chat['barter_ids'].first,
+                          proposerId: chat['proposer_id'],
+                          receiverId: chat['receiver_id'],
+                          unreadCount: chat['unread_count'] ?? 0,
+                          refreshParent: _fetchChats, // Actualizar al regresar
+                        );
+                      },
                     );
                   },
-                );
-              },
-            ),
+                ),
+        ),
+      ),
     );
   }
 }
@@ -201,6 +217,7 @@ class _ChatItem extends StatelessWidget {
   final String proposerId;
   final String receiverId;
   final int unreadCount;
+  final Future<void> Function() refreshParent;
 
   const _ChatItem({
     required this.chatTitle,
@@ -210,6 +227,7 @@ class _ChatItem extends StatelessWidget {
     required this.proposerId,
     required this.receiverId,
     required this.unreadCount,
+    required this.refreshParent,
   });
 
   @override
@@ -227,7 +245,7 @@ class _ChatItem extends StatelessWidget {
                 ),
               ),
             )
-            .then((_) => Navigator.of(context).pop());
+            .then((_) => refreshParent()); // Actualiza la pantalla al volver
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
@@ -248,7 +266,8 @@ class _ChatItem extends StatelessWidget {
             CircleAvatar(
               backgroundColor: AppColors.shadow,
               radius: 28,
-              child: Icon(Icons.person, color: AppColors.textPrimary, size: 30),
+              child: Icon(Icons.person,
+                  color: AppColors.textPrimary, size: 30),
             ),
             const SizedBox(width: 12),
             Expanded(

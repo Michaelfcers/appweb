@@ -20,22 +20,21 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final UserService userService = UserService(); // Servicio para obtener libros
-  final NotificationService notificationService = NotificationService(); // Servicio de notificaciones
-  List<Book> allBooks = []; // Lista de libros obtenidos
-  bool isLoading = true; // Estado de carga
-  int unreadMessagesCount = 0; // Contador de mensajes no leídos
-  int unreadNotificationsCount = 0; // Contador de notificaciones no leídas
+  final UserService userService = UserService();
+  final NotificationService notificationService = NotificationService();
+  List<Book> allBooks = [];
+  bool isLoading = true;
+  int unreadMessagesCount = 0;
+  int unreadNotificationsCount = 0;
 
   @override
   void initState() {
     super.initState();
     fetchBooks();
     fetchUnreadCounts();
-    setupRealtimeListeners(); // Configura las suscripciones en tiempo real
+    setupRealtimeListeners();
   }
 
-  /// Configuración de las suscripciones en tiempo real
   void setupRealtimeListeners() {
     // Suscripción en tiempo real a nuevos mensajes
     notificationService.subscribeToMessages((message) async {
@@ -58,11 +57,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    notificationService.dispose(); // Limpia las suscripciones
+    notificationService.dispose();
     super.dispose();
   }
 
-  /// Obtiene la lista de libros del servidor
   Future<void> fetchBooks() async {
     try {
       final books = await userService.getBooksFromOtherUsers();
@@ -81,14 +79,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Obtiene la cantidad de mensajes y notificaciones no leídos
   Future<void> fetchUnreadCounts() async {
     try {
       final unreadChats = await notificationService.getUnreadChatsCount();
       final unreadNotifications = await notificationService.getUnreadNotificationsCount();
-
       if (!mounted) return;
-
       setState(() {
         unreadMessagesCount = unreadChats;
         unreadNotificationsCount = unreadNotifications;
@@ -136,7 +131,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Construcción del AppBar con íconos para mensajes y notificaciones
   AppBar _buildAppBar(BuildContext context) {
     return AppBar(
       elevation: 0,
@@ -155,13 +149,16 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             IconButton(
               icon: Icon(Icons.message, color: AppColors.textPrimary),
-              onPressed: () {
-                Navigator.push(
+              onPressed: () async {
+                final result = await Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const MessagesScreen(),
-                  ),
-                ).then((_) => fetchUnreadCounts());
+                  MaterialPageRoute(builder: (context) => const MessagesScreen()),
+                );
+
+                // Verificar si hubo un cambio en los mensajes no leídos
+                if (result == true) {
+                  fetchUnreadCounts();
+                }
               },
             ),
             if (unreadMessagesCount > 0)
@@ -286,9 +283,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       topRight: Radius.circular(15),
                     ),
                     image: DecorationImage(
-                      image: NetworkImage(
-                        _determineThumbnail(book),
-                      ),
+                      image: NetworkImage(_determineThumbnail(book)),
                       fit: BoxFit.cover,
                       onError: (exception, stackTrace) {
                         debugPrint('Error loading image: $exception');
