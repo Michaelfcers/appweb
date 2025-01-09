@@ -6,6 +6,7 @@ import '../../auth_notifier.dart';
 import '../Settings/politicas.dart'; // Importa la pantalla de políticas
 import '../Login/recovery_password_screen.dart'; // Importa la pantalla de cambio de contraseña
 import '../trade_management/trade_management_screen.dart'; // Importa la pantalla de gestión de trueques
+import '../trade_management/trade_history.dart'; // Importa la pantalla de historial de trueques
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -92,6 +93,17 @@ class SettingsScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const TradeManagementScreen()),
+              );
+            },
+          ),
+          _buildSettingsOption(
+            context,
+            icon: Icons.history,
+            title: "Historial de Trueques",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TradeHistoryScreen()),
               );
             },
           ),
