@@ -54,25 +54,22 @@ class TradeProposalDialog extends StatelessWidget {
                       targetBook!['author'] ?? 'Autor no disponible',
                       style: const TextStyle(fontSize: 12),
                     ),
-                    leading: targetBook!['cover_url'] != null &&
-                            (targetBook!['cover_url'] as String).isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              targetBook!['cover_url'] ?? '',
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(
-                                  Icons.broken_image,
-                                  size: 50,
-                                  color: Colors.grey,
-                                );
-                              },
-                            ),
-                          )
-                        : const Icon(Icons.book, size: 50),
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        _determineThumbnail(targetBook!),
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.broken_image,
+                            size: 50,
+                            color: Colors.grey,
+                          );
+                        },
+                      ),
+                    ),
                   )
                 : const Text(
                     'No se pudo encontrar el libro objetivo.',
@@ -96,25 +93,22 @@ class TradeProposalDialog extends StatelessWidget {
                           book['author'] ?? 'Autor no disponible',
                           style: const TextStyle(fontSize: 12),
                         ),
-                        leading: book['cover_url'] != null &&
-                                (book['cover_url'] as String).isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  book['cover_url'] ?? '',
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(
-                                      Icons.broken_image,
-                                      size: 50,
-                                      color: Colors.grey,
-                                    );
-                                  },
-                                ),
-                              )
-                            : const Icon(Icons.book, size: 50),
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            _determineThumbnail(book),
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.broken_image,
+                                size: 50,
+                                color: Colors.grey,
+                              );
+                            },
+                          ),
+                        ),
                       );
                     }).toList(),
                   )
@@ -170,10 +164,10 @@ class TradeProposalDialog extends StatelessWidget {
   try {
     final supabase = Supabase.instance.client;
 
-    // Actualizar el estado del trueque
+    // Verificar si el trueque sigue pendiente
     final barter = await supabase
         .from('barters')
-        .select('status')
+        .select('status, target_book_id')
         .eq('id', barterId)
         .single();
 
@@ -185,15 +179,46 @@ class TradeProposalDialog extends StatelessWidget {
       return;
     }
 
+    // Actualizar el estado del trueque
     await supabase
         .from('barters')
         .update({'status': response})
         .eq('id', barterId);
 
     if (response == 'accepted') {
-  // Bloquear libros ofrecidos por el proponente
-}
+      // Obtener el ID del libro objetivo
+      final targetBookId = barter['target_book_id'];
+      debugPrint('ID del libro objetivo a deshabilitar: $targetBookId');
 
+      // Bloquear el libro objetivo
+      final targetUpdateResponse = await supabase
+          .from('books')
+          .update({'status': 'disabled'}) // Cambiado a `status`
+          .eq('id', targetBookId)
+          .select(); // Esto devuelve los datos actualizados
+
+      debugPrint('Resultado actualización libro objetivo: $targetUpdateResponse');
+
+      // Obtener los libros ofrecidos del trueque
+      final bookDetails = await supabase
+          .from('barter_details')
+          .select('book_id')
+          .eq('barter_id', barterId);
+
+      for (final bookDetail in bookDetails) {
+        final bookId = bookDetail['book_id'];
+        debugPrint('Deshabilitando libro ofrecido: $bookId');
+
+        // Bloquear los libros ofrecidos
+        final offerUpdateResponse = await supabase
+            .from('books')
+            .update({'status': 'disabled'}) // Cambiado a `status`
+            .eq('id', bookId)
+            .select(); // Esto devuelve los datos actualizados
+
+        debugPrint('Resultado actualización libro ofrecido ($bookId): $offerUpdateResponse');
+      }
+    }
 
     // Enviar notificación al proponente
     final proposerId = (await supabase
@@ -231,6 +256,10 @@ class TradeProposalDialog extends StatelessWidget {
   }
 }
 
+
+
+
+
   void _showErrorDialog(BuildContext context, String message) {
     showDialog(
       context: context,
@@ -247,5 +276,27 @@ class TradeProposalDialog extends StatelessWidget {
         );
       },
     );
+  }
+
+  String _determineThumbnail(Map<String, dynamic> book) {
+    // Prioriza las imágenes subidas manualmente.
+    if (book['photos'] != null && (book['photos'] as List).isNotEmpty) {
+      return _sanitizeImageUrl((book['photos'] as List).first);
+    }
+
+    // Si no hay imágenes subidas, usa el `cover_url` de la base de datos.
+    if (book['cover_url'] != null && (book['cover_url'] as String).isNotEmpty) {
+      return _sanitizeImageUrl(book['cover_url']);
+    }
+
+    // Si no hay ninguna imagen, usa una imagen predeterminada.
+    return 'https://via.placeholder.com/150';
+  }
+
+  String _sanitizeImageUrl(String url) {
+    if (url.contains('/books/books/')) {
+      return url.replaceAll('/books/books/', '/books/');
+    }
+    return url;
   }
 }

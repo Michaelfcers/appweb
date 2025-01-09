@@ -3,6 +3,7 @@ import '../../models/book_model.dart';
 import '../../services/user_service.dart';
 import '../../styles/colors.dart';
 import '../Books/book_details_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -26,21 +27,52 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Future<void> fetchUserProfileAndBooks() async {
-    try {
-      final response = await userService.getUserProfileAndBooks(widget.userId);
+  try {
+    debugPrint('userId: ${widget.userId}');
+    final response = await userService.getUserProfileAndBooks(widget.userId);
 
-      setState(() {
-        userProfile = response['userDetails'];
-        userBooks = response['userBooks'];
-        isLoading = false;
-      });
-    } catch (error) {
-      debugPrint('Error al obtener datos del usuario: $error');
-      setState(() {
-        isLoading = false;
-      });
-    }
+    setState(() {
+      userProfile = response['userDetails'];
+      userBooks = response['userBooks'];
+      isLoading = false;
+    });
+
+    // Depura el valor de avatar_url
+    debugPrint('Avatar URL en base de datos: ${userProfile?['avatar_url']}');
+  } catch (error) {
+    debugPrint('Error al obtener datos del usuario: $error');
+    setState(() {
+      isLoading = false;
+    });
   }
+}
+
+
+
+
+  Future<String> getAvatarUrl(String? avatarPath) async {
+  if (avatarPath == null || avatarPath.isEmpty) {
+    debugPrint('El avatarPath está vacío o es nulo. No se puede generar una URL.');
+    return ''; // Devuelve una URL vacía
+  }
+
+  try {
+    final signedUrlResponse = await Supabase.instance.client.storage
+        .from('avatars')
+        .createSignedUrl(avatarPath, 60 * 60); // URL válida por 1 hora
+    debugPrint('Signed URL: $signedUrlResponse');
+    return signedUrlResponse;
+  } catch (e) {
+    debugPrint('Error al obtener la URL firmada: $e');
+    return ''; // Devuelve una URL vacía en caso de error
+  }
+}
+
+
+
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -67,11 +99,31 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       CircleAvatar(
-                        radius: 40,
-                        backgroundColor: AppColors.shadow,
-                        child: Icon(Icons.person,
-                            size: 40, color: AppColors.textPrimary),
-                      ),
+  radius: 50,
+  backgroundColor: AppColors.shadow,
+  child: FutureBuilder<String>(
+    future: getAvatarUrl(userProfile?['avatar_url']),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return CircularProgressIndicator(color: AppColors.iconSelected);
+      }
+      if (snapshot.hasError || snapshot.data == '') {
+        return Icon(Icons.person, size: 50, color: AppColors.textPrimary);
+      }
+      return ClipOval(
+        child: Image.network(
+          snapshot.data!,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Icon(Icons.person, size: 50, color: AppColors.textPrimary);
+          },
+        ),
+      );
+    },
+  ),
+),
+
+
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
@@ -133,7 +185,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         crossAxisCount: 2,
                         mainAxisSpacing: 8.0,
                         crossAxisSpacing: 8.0,
-                        childAspectRatio: 1.0,
+                        childAspectRatio: 0.8,
                       ),
                       itemCount: userBooks.length,
                       itemBuilder: (context, index) {
@@ -161,19 +213,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(10),
-                                      topRight: Radius.circular(10),
-                                    ),
-                                    image: DecorationImage(
-                                      image: NetworkImage(
-                                        _determineThumbnail(book),
-                                      ),
-                                      fit: BoxFit.cover,
-                                    ),
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(10),
+                                    topRight: Radius.circular(10),
+                                  ),
+                                  child: Image.network(
+                                    _determineThumbnail(book),
+                                    height: 120,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
                                   ),
                                 ),
                                 Padding(
@@ -217,24 +266,28 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   String _determineThumbnail(Book book) {
-    // Prioriza las imágenes subidas manualmente.
-    if (book.photos != null && book.photos!.isNotEmpty) {
-      return _sanitizeImageUrl(book.photos!.first);
+    try {
+      if (book.photos != null && book.photos!.isNotEmpty) {
+        return _sanitizeImageUrl(book.photos!.first);
+      }
+      if (book.thumbnail.isNotEmpty) {
+        return _sanitizeImageUrl(book.thumbnail);
+      }
+    } catch (e) {
+      debugPrint('Error determinando el thumbnail: $e');
     }
-
-    // Si no hay imágenes subidas, usa el thumbnail de la API.
-    if (book.thumbnail.isNotEmpty) {
-      return _sanitizeImageUrl(book.thumbnail);
-    }
-
-    // Si no hay ninguna imagen, usa una imagen predeterminada.
-    return 'https://via.placeholder.com/150';
+    return 'https://via.placeholder.com/150?text=No+Image';
   }
 
   String _sanitizeImageUrl(String url) {
-    if (url.contains('/books/books/')) {
-      return url.replaceAll('/books/books/', '/books/');
+    try {
+      if (url.contains('/books/books/')) {
+        return url.replaceAll('/books/books/', '/books/');
+      }
+      return url;
+    } catch (e) {
+      debugPrint('Error sanitizando la URL de la imagen: $e');
+      return 'https://via.placeholder.com/150?text=Error';
     }
-    return url;
   }
 }

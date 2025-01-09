@@ -13,11 +13,13 @@ class MessagesScreen extends StatefulWidget {
 class _MessagesScreenState extends State<MessagesScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> chats = [];
+  late RealtimeChannel _realtimeChannel;
 
   @override
   void initState() {
     super.initState();
     _fetchChats();
+    _setupRealtimeListeners();
   }
 
   Future<void> _fetchChats() async {
@@ -25,7 +27,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
       final response = await _supabase
           .from('barters')
           .select(
-              'id, proposer_id, receiver_id, messages (message, created_at, sender_id)')
+              'id, proposer_id, receiver_id, messages (id, message, created_at, sender_id, receiver_id, is_read)')
           .eq('status', 'accepted')
           .or(
             'proposer_id.eq.${_supabase.auth.currentUser!.id},receiver_id.eq.${_supabase.auth.currentUser!.id}',
@@ -47,6 +49,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
         if (!groupedChats.containsKey(otherUserId)) {
           groupedChats[otherUserId] = {
             'user_id': otherUserId,
+            'proposer_id': chat['proposer_id'],
+            'receiver_id': chat['receiver_id'],
             'barter_ids': [chat['id']],
             'messages': chat['messages'] ?? [],
           };
@@ -56,11 +60,15 @@ class _MessagesScreenState extends State<MessagesScreen> {
         }
       }
 
+      // Calcular mensajes no leídos por chat
       for (final entry in groupedChats.entries) {
-        entry.value['messages']!.sort(
-          (a, b) => DateTime.parse(b['created_at'] ?? "")
-              .compareTo(DateTime.parse(a['created_at'] ?? "")),
-        );
+        final unreadMessages = (entry.value['messages'] as List)
+            .where((message) =>
+                message['receiver_id'] == _supabase.auth.currentUser!.id &&
+                message['is_read'] == false)
+            .length;
+
+        entry.value['unread_count'] = unreadMessages; // Mensajes no leídos por chat
       }
 
       setState(() {
@@ -69,6 +77,46 @@ class _MessagesScreenState extends State<MessagesScreen> {
     } catch (e) {
       debugPrint('Error al obtener chats: $e');
     }
+  }
+
+  void _setupRealtimeListeners() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    // Configura el canal Realtime para la tabla `messages`
+    _realtimeChannel = _supabase.channel('public:messages');
+
+    _realtimeChannel.on(
+      RealtimeListenTypes.postgresChanges,
+      ChannelFilter(
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+      ),
+      (payload, [ref]) async {
+        if (payload == null || payload['new'] == null) return;
+
+        final newMessage = payload['new'] as Map<String, dynamic>;
+
+        // Si el mensaje pertenece a este usuario, actualiza la lista de chats
+        if (newMessage['receiver_id'] == userId) {
+          debugPrint('Nuevo mensaje recibido: $newMessage');
+          await _fetchChats();
+        }
+      },
+    );
+
+    try {
+      _realtimeChannel.subscribe();
+    } catch (e) {
+      debugPrint('Error al suscribirse al canal Realtime: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _realtimeChannel.unsubscribe();
+    super.dispose();
   }
 
   Future<Map<String, dynamic>> _fetchUserDetails(String userId) async {
@@ -120,10 +168,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     }
                     final user = snapshot.data!;
                     final lastMessage = (chat['messages'] as List).isNotEmpty
-                        ? chat['messages'].first['message']
+                        ? chat['messages'].last['message']
                         : "Sin mensajes aún";
                     final lastTime = (chat['messages'] as List).isNotEmpty
-                        ? DateTime.parse(chat['messages'].first['created_at'])
+                        ? DateTime.parse(chat['messages'].last['created_at'])
                         : null;
 
                     return _ChatItem(
@@ -133,6 +181,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           ? "${lastTime.hour}:${lastTime.minute.toString().padLeft(2, '0')}"
                           : "N/A",
                       barterId: chat['barter_ids'].first,
+                      proposerId: chat['proposer_id'],
+                      receiverId: chat['receiver_id'],
+                      unreadCount: chat['unread_count'] ?? 0,
                     );
                   },
                 );
@@ -147,23 +198,36 @@ class _ChatItem extends StatelessWidget {
   final String lastMessage;
   final String time;
   final String barterId;
+  final String proposerId;
+  final String receiverId;
+  final int unreadCount;
 
   const _ChatItem({
     required this.chatTitle,
     required this.lastMessage,
     required this.time,
     required this.barterId,
+    required this.proposerId,
+    required this.receiverId,
+    required this.unreadCount,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ChatScreen(chatTitle: chatTitle, barterId: barterId),
-          ),
-        );
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(
+                  chatTitle: chatTitle,
+                  barterId: barterId,
+                  proposerId: proposerId,
+                  receiverId: receiverId,
+                ),
+              ),
+            )
+            .then((_) => Navigator.of(context).pop());
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
@@ -191,13 +255,12 @@ class _ChatItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Nickname siempre en negro
                   Text(
                     chatTitle,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black, // Siempre negro
+                      color: Colors.black,
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -211,12 +274,34 @@ class _ChatItem extends StatelessWidget {
                 ],
               ),
             ),
-            Text(
-              time,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (unreadCount > 0)
+                  Container(
+                    margin: const EdgeInsets.only(top: 5),
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),

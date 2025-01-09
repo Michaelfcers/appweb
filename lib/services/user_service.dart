@@ -90,31 +90,44 @@ class UserService {
 
 
   // Obtener libros subidos por el usuario autenticado
-  Future<List<Book>> getUploadedBooks() async {
-    final userId = getCurrentUserId();
+Future<List<Book>> getUploadedBooks({String? status}) async {
+  final userId = getCurrentUserId();
 
-    if (userId == null) {
-      throw Exception('Usuario no autenticado.');
-    }
-
-    try {
-      final response = await _supabase
-          .from('books')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
-
-      if (response is List && response.isNotEmpty) {
-        return response.map((book) => Book.fromSupabaseJson(book)).toList();
-      } else {
-        print('No se encontraron libros subidos.');
-        return [];
-      }
-    } catch (e) {
-      print('Error al obtener los libros subidos: $e');
-      rethrow;
-    }
+  if (userId == null) {
+    throw Exception('Usuario no autenticado.');
   }
+
+  try {
+    // Construir la consulta inicial
+    final query = _supabase
+        .from('books')
+        .select('*') // Seleccionamos todos los campos
+        .eq('user_id', userId); // Filtrar por usuario
+
+    // Aplicar el filtro de estado si se proporciona
+    if (status != null) {
+      query.eq('status', status);
+    }
+
+    // Ejecutar la consulta
+    final response = await query.order('created_at', ascending: false);
+
+    // Verificar si la respuesta contiene datos
+    if (response.isEmpty) {
+      print('No se encontraron libros subidos.');
+      return [];
+    }
+
+    // Convertir la respuesta en una lista de objetos `Book`
+    return (response as List<dynamic>)
+        .map((bookData) => Book.fromSupabaseJson(bookData as Map<String, dynamic>))
+        .toList();
+  } catch (e) {
+    print('Error al obtener los libros subidos: $e');
+    rethrow;
+  }
+}
+
 
 Future<void> updateBook({
   required String bookId,
@@ -258,11 +271,12 @@ Future<Map<String, dynamic>> getUserProfileAndBooks(String userId) async {
       throw Exception('Usuario no encontrado.');
     }
 
-    // Obtener libros subidos por el usuario
+    // Obtener libros subidos por el usuario y habilitados
     final booksResponse = await _supabase
         .from('books')
         .select('*')
         .eq('user_id', userId)
+        .eq('status', 'enabled') // Usar 'status' en lugar de 'book_status'
         .order('created_at', ascending: false);
 
     List<Book> books = [];
@@ -270,7 +284,6 @@ Future<Map<String, dynamic>> getUserProfileAndBooks(String userId) async {
       books = booksResponse.map((book) => Book.fromSupabaseJson(book)).toList();
     }
 
-    // Retornar un mapa con los detalles y libros del usuario
     return {
       'userDetails': userDetailsResponse as Map<String, dynamic>,
       'userBooks': books,
@@ -282,31 +295,34 @@ Future<Map<String, dynamic>> getUserProfileAndBooks(String userId) async {
 }
 
 
+
+
   // Método para obtener libros de otros usuarios
   Future<List<Book>> getBooksFromOtherUsers() async {
-    try {
-      final userId = getCurrentUserId();
+  try {
+    final userId = getCurrentUserId();
 
-      if (userId == null) {
-        throw Exception('Usuario no autenticado.');
-      }
-
-      final response = await _supabase
-          .from('books')
-          .select('*')
-          .neq('user_id', userId); // Excluye los libros del usuario actual
-
-      if (response is List && response.isNotEmpty) {
-        return response.map((book) => Book.fromSupabaseJson(book)).toList();
-      } else {
-        print("No se encontraron libros de otros usuarios.");
-        return [];
-      }
-    } catch (e) {
-      print('Error al obtener libros de otros usuarios: $e');
-      rethrow;
+    if (userId == null) {
+      throw Exception('Usuario no autenticado.');
     }
+
+    final response = await _supabase
+        .from('books')
+        .select('*')
+        .neq('user_id', userId) // Excluye los libros del usuario actual
+        .eq('status', 'enabled'); // Usar 'status' en lugar de 'book_status'
+
+    if (response is List && response.isNotEmpty) {
+      return response.map((book) => Book.fromSupabaseJson(book)).toList();
+    } else {
+      print("No se encontraron libros de otros usuarios.");
+      return [];
+    }
+  } catch (e) {
+    print('Error al obtener libros de otros usuarios: $e');
+    rethrow;
   }
+}
 
   // Crear una nueva propuesta de trueque
   Future<String> createBarter({
@@ -496,12 +512,29 @@ Future<void> respondToTradeProposal({
 
       for (final bookDetail in bookDetails) {
         final bookId = bookDetail['book_id'];
-        // En este punto solo imprimimos los libros para asegurarnos de que todo funciona
-        print('Libro ofrecido: $bookId');
+
+        // Actualiza el estado del libro ofrecido a 'disabled'
+        await _supabase
+            .from('books')
+            .update({'status': 'disabled'}) // Usar 'status' en lugar de 'book_status'
+            .eq('id', bookId);
       }
+
+      // Deshabilita también el libro objetivo del trueque
+      final barterResponse = await _supabase
+          .from('barters')
+          .select('target_book_id')
+          .eq('id', barterId)
+          .single();
+
+      final targetBookId = barterResponse['target_book_id'];
+      await _supabase
+          .from('books')
+          .update({'status': 'disabled'}) // Usar 'status' en lugar de 'book_status'
+          .eq('id', targetBookId);
     }
 
-    // Obtener el ID del proponente del trueque
+    // Notificación al proponente
     final proposerResponse = await _supabase
         .from('barters')
         .select('proposer_id')
@@ -510,7 +543,6 @@ Future<void> respondToTradeProposal({
 
     final proposerId = proposerResponse['proposer_id'];
 
-    // Enviar una notificación al proponente sobre el resultado del trueque
     await _supabase.from('notifications').insert({
       'user_id': proposerId,
       'type': response == 'accepted' ? 'trade_accepted' : 'trade_rejected',
@@ -518,7 +550,7 @@ Future<void> respondToTradeProposal({
           ? 'Tu propuesta de trueque ha sido aceptada.'
           : 'Tu propuesta de trueque ha sido rechazada.',
       'read': false,
-      'barter_id': barterId, // Asociar la notificación al trueque
+      'barter_id': barterId,
       'created_at': DateTime.now().toIso8601String(),
     });
 
@@ -531,20 +563,22 @@ Future<void> respondToTradeProposal({
 
 
 
-
-
 Future<List<Book>> searchBooks(String query) async {
-    final response = await _supabase
-        .from('books')
-        .select()
-        .ilike('title', '%$query%'); // Busca por título de forma insensible a mayúsculas
+  final response = await _supabase
+      .from('books')
+      .select('*')
+      .ilike('title', '%$query%')
+      .eq('status', 'enabled'); // Usar 'status' en lugar de 'book_status'
 
-    if (response.error != null) {
-      throw Exception('Error al buscar libros: ${response.error!.message}');
-    }
-
-    return (response.data as List).map((book) => Book.fromSupabaseJson(book)).toList();
+  if (response is List && response.isNotEmpty) {
+    return response.map((book) => Book.fromSupabaseJson(book)).toList();
+  } else {
+    print("No se encontraron libros para la búsqueda.");
+    return [];
   }
+}
+
+
   
 
 

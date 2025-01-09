@@ -11,9 +11,10 @@ class Book {
   final String? condition;
   final String? userId;
   final List<String>? photos;
+  final String status; // Nueva propiedad para el estado del libro
 
   Book({
-    required this.id, // Ahora incluye el campo `id`
+    required this.id,
     required this.title,
     required this.author,
     required this.thumbnail,
@@ -23,6 +24,7 @@ class Book {
     this.condition,
     this.userId,
     this.photos,
+    this.status = 'enabled', // Valor por defecto solo para el modelo
   });
 
   // Método para crear una instancia de Book desde JSON de Google Books API
@@ -50,7 +52,7 @@ class Book {
   // Método para crear una instancia de Book desde JSON de Supabase
   factory Book.fromSupabaseJson(Map<String, dynamic> json) {
     return Book(
-      id: json['id'] ?? '', // Recuperamos el id del libro desde Supabase
+      id: json['id'] ?? '',
       title: json['title'] ?? 'Título desconocido',
       author: json['author'] ?? 'Autor desconocido',
       thumbnail: json['cover_url'] ?? 'https://via.placeholder.com/150',
@@ -62,21 +64,22 @@ class Book {
       photos: (json['photos'] != null)
           ? List<String>.from(jsonDecode(json['photos']))
           : null,
+      status: json['status'] ?? 'enabled', // Mapea el campo desde Supabase
     );
   }
 
-String get primaryImage {
-  if (thumbnail.isNotEmpty) {
-    return thumbnail;
-  } else if (photos != null && photos!.isNotEmpty) {
-    return photos!.first;
+  String get primaryImage {
+    if (thumbnail.isNotEmpty) {
+      return thumbnail;
+    } else if (photos != null && photos!.isNotEmpty) {
+      return photos!.first;
+    }
+    return 'https://via.placeholder.com/150'; // Imagen por defecto
   }
-  return 'https://via.placeholder.com/150'; // Imagen de marcador por defecto
-}
 
   // Método para convertir un objeto Book a JSON (útil para actualizar libros)
   Map<String, dynamic> toJson() {
-    return {
+    final data = {
       'id': id,
       'title': title,
       'author': author,
@@ -88,5 +91,12 @@ String get primaryImage {
       'user_id': userId,
       'photos': photos != null ? jsonEncode(photos) : null,
     };
+
+    // `status` solo se envía si es necesario actualizarlo explícitamente
+    if (status != 'enabled') {
+      data['status'] = status;
+    }
+
+    return data;
   }
 }

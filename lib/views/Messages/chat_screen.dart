@@ -5,8 +5,16 @@ import '../../styles/colors.dart';
 class ChatScreen extends StatefulWidget {
   final String chatTitle;
   final String barterId;
+  final String proposerId; // ID del usuario que propuso el trueque
+  final String receiverId; // ID del usuario receptor del trueque
 
-  const ChatScreen({super.key, required this.chatTitle, required this.barterId});
+  const ChatScreen({
+    super.key,
+    required this.chatTitle,
+    required this.barterId,
+    required this.proposerId,
+    required this.receiverId,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -28,14 +36,33 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _fetchMessages() async {
     try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
       final response = await _supabase
           .from('messages')
           .select()
           .eq('barter_id', widget.barterId)
           .order('created_at', ascending: true);
 
+      final fetchedMessages = List<Map<String, dynamic>>.from(response);
+
+      // Identificar y marcar mensajes no leídos
+      final unreadMessageIds = fetchedMessages
+          .where((msg) =>
+              msg['receiver_id'] == userId && msg['is_read'] == false)
+          .map((msg) => msg['id'])
+          .toList();
+
+      if (unreadMessageIds.isNotEmpty) {
+        await _supabase
+            .from('messages')
+            .update({'is_read': true})
+            .in_('id', unreadMessageIds);
+      }
+
       setState(() {
-        messages = List<Map<String, dynamic>>.from(response);
+        messages = fetchedMessages;
       });
 
       _scrollToBottom();
@@ -45,6 +72,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _setupRealtimeListener() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
     _realtimeChannel = _supabase.channel('public:messages');
 
     _realtimeChannel.on(
@@ -55,28 +85,33 @@ class _ChatScreenState extends State<ChatScreen> {
         table: 'messages',
         filter: 'barter_id=eq.${widget.barterId}',
       ),
-      (payload, [ref]) {
-        debugPrint('Nuevo mensaje recibido: $payload');
+      (payload, [ref]) async {
+        if (payload == null || payload['new'] == null) return;
+
         final newMessage = payload['new'] as Map<String, dynamic>;
 
-        // Verifica si el mensaje ya está en la lista para evitar duplicados
-        final messageExists = messages.any((message) => message['id'] == newMessage['id']);
-
-        if (!messageExists) {
-          setState(() {
-            messages.add(newMessage);
-            messages.sort((a, b) => DateTime.parse(a['created_at'])
-                .compareTo(DateTime.parse(b['created_at'])));
-          });
-          _scrollToBottom();
+        // Marcar mensaje como leído si es para el usuario actual
+        if (newMessage['receiver_id'] == userId && !newMessage['is_read']) {
+          await _supabase
+              .from('messages')
+              .update({'is_read': true})
+              .eq('id', newMessage['id']);
         }
+
+        setState(() {
+          messages.add(newMessage);
+          messages.sort((a, b) => DateTime.parse(a['created_at'])
+              .compareTo(DateTime.parse(b['created_at'])));
+        });
+
+        _scrollToBottom();
       },
     );
 
     try {
       _realtimeChannel.subscribe();
-    } catch (error) {
-      debugPrint('Error al suscribirse al canal: $error');
+    } catch (e) {
+      debugPrint('Error al suscribirse al canal de mensajes: $e');
     }
   }
 
@@ -96,26 +131,42 @@ class _ChatScreenState extends State<ChatScreen> {
     final messageText = _messageController.text.trim();
     if (messageText.isEmpty) return;
 
+    final senderId = _supabase.auth.currentUser?.id; // ID del remitente
+    if (senderId == null) return;
+
+    // Obtén el ID del receptor basado en la lógica de tu aplicación
+    final receiverId = obtenerReceiverId(); // Ajusta esto a tu lógica
+
+    if (receiverId == null) {
+      debugPrint('Error: El ID del receptor no puede ser NULL');
+      return;
+    }
+
     final newMessage = {
-      'barter_id': widget.barterId,
-      'sender_id': _supabase.auth.currentUser!.id,
-      'receiver_id': null,
-      'message': messageText,
-      'created_at': DateTime.now().toIso8601String(),
+      'barter_id': widget.barterId, // ID del trueque o chat
+      'sender_id': senderId, // El remitente
+      'receiver_id': receiverId, // El receptor
+      'message': messageText, // Texto del mensaje
+      'is_read': false, // El mensaje comienza como no leído
+      'created_at': DateTime.now().toIso8601String(), // Fecha de creación
     };
 
     try {
-      await _supabase
-          .from('messages')
-          .insert(newMessage)
-          .select()
-          .single(); // Selecciona el mensaje insertado.
+      await _supabase.from('messages').insert(newMessage);
+      _messageController.clear();
     } catch (e) {
       debugPrint('Error al enviar mensaje: $e');
-    } finally {
-      setState(() {
-        _messageController.clear();
-      });
+    }
+  }
+
+  String? obtenerReceiverId() {
+    final userId = _supabase.auth.currentUser?.id;
+
+    // Determina si el usuario actual es el que propuso el trueque
+    if (userId == widget.proposerId) {
+      return widget.receiverId; // Si es el proponente, el receptor es el otro
+    } else {
+      return widget.proposerId; // Si no, es el proponente
     }
   }
 
@@ -158,7 +209,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 final isSender =
                     message['sender_id'] == _supabase.auth.currentUser!.id;
                 return Align(
-                  alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment:
+                      isSender ? Alignment.centerRight : Alignment.centerLeft,
                   child: BubbleMessage(
                     message: message['message'] ?? '',
                     isSender: isSender,

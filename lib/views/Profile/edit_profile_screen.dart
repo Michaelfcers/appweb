@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../styles/colors.dart';
+import 'dart:io';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -17,8 +18,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController nicknameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   bool isLoading = false;
-  bool isUploadingImage = false; // Animación de carga
-  String? avatarUrl;
+  String? avatarUrl; // URL actual del avatar
+  String? tempAvatarUrl; // URL temporal para la nueva imagen
 
   Map<String, String?> errorMessages = {
     "name": null,
@@ -72,68 +73,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  Future<void> _pickAndUploadImage() async {
-  final picker = ImagePicker();
-  final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
-  if (pickedFile == null) return;
-
-  setState(() {
-    isLoading = true; // Mostrar animación de carga
-  });
-
-  try {
-    final userId = _supabase.auth.currentUser?.id;
-    if (userId == null) {
-      _showErrorDialog("Usuario no autenticado.");
-      return;
-    }
-
-    // Definir el nombre del archivo basado en el usuario
-    final fileName = 'avatars/$userId-avatar.jpg';
-
-    // Leer los bytes de la imagen seleccionada
-    final fileBytes = await pickedFile.readAsBytes();
-
-    // Subir el nuevo archivo
-    await _supabase.storage
-        .from('avatars')
-        .uploadBinary(fileName, fileBytes, fileOptions: const FileOptions(upsert: true));
-
-    // Obtener la nueva URL pública con cache busting
-    final publicUrl =
-        '${_supabase.storage.from('avatars').getPublicUrl(fileName)}?t=${DateTime.now().millisecondsSinceEpoch}';
-
-    // Actualizar la URL en la base de datos del usuario
-    final response = await _supabase
-        .from('users')
-        .update({'avatar_url': publicUrl})
-        .eq('id', userId)
-        .select(); // Asegurar obtener la respuesta actualizada
-
-    // Verificar si hubo algún error en la respuesta
-    if (response.isNotEmpty) {
-      final updatedAvatarUrl = response[0]['avatar_url'];
+    if (pickedFile != null) {
+      // Actualizamos la URL temporal para mostrar la nueva imagen.
       setState(() {
-        avatarUrl = updatedAvatarUrl; // Actualizar la imagen de perfil en tiempo real
+        tempAvatarUrl = pickedFile.path;
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Imagen de perfil actualizada con éxito.')),
-      );
-    } else {
-      throw Exception("Error al actualizar la imagen en la base de datos.");
     }
-  } catch (e) {
-    _showErrorDialog("Error al subir la imagen: $e");
-  } finally {
-    setState(() {
-      isLoading = false; // Ocultar animación de carga
-    });
   }
-}
 
+  Future<String?> _uploadImage(String filePath) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return null;
 
+      final fileName = 'avatars/$userId-avatar.jpg';
+      final fileBytes = await XFile(filePath).readAsBytes();
+
+      await _supabase.storage
+          .from('avatars')
+          .uploadBinary(fileName, fileBytes, fileOptions: const FileOptions(upsert: true));
+
+      final publicUrl =
+          '${_supabase.storage.from('avatars').getPublicUrl(fileName)}?t=${DateTime.now().millisecondsSinceEpoch}';
+      return publicUrl;
+    } catch (e) {
+      _showErrorDialog("Error al subir la imagen: $e");
+      return null;
+    }
+  }
 
   Future<void> _saveChanges() async {
     setState(() {
@@ -165,13 +136,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     if (hasErrors) {
-      setState(() {}); // Actualizar la UI para mostrar errores
+      setState(() {});
       return;
+    }
+
+    String? uploadedAvatarUrl = avatarUrl;
+
+    // Subir la imagen si hay una nueva seleccionada.
+    if (tempAvatarUrl != null) {
+      uploadedAvatarUrl = await _uploadImage(tempAvatarUrl!);
+      if (uploadedAvatarUrl == null) return; // Detener si la subida falla.
     }
 
     final updates = {
       'name': name,
       'nickname': nickname,
+      'avatar_url': uploadedAvatarUrl,
       'updated_at': DateTime.now().toIso8601String(),
     };
 
@@ -322,44 +302,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               child: Column(
                 children: [
                   Center(
-  child: Stack(
-    children: [
-      CircleAvatar(
-        radius: 60,
-        backgroundImage:
-            avatarUrl != null ? NetworkImage(avatarUrl!) : null,
-        child: avatarUrl == null
-            ? Icon(Icons.person, size: 50, color: AppColors.textPrimary)
-            : null,
-      ),
-      if (isUploadingImage)
-        Positioned.fill(
-          child: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-      Positioned(
-        bottom: 0,
-        right: 0,
-        child: InkWell(
-          onTap: _pickAndUploadImage,
-          child: CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.iconSelected,
-            child: const Icon(Icons.camera_alt, color: Colors.white),
-          ),
-        ),
-      ),
-    ],
-  ),
-),
-
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 60,
+                          backgroundImage: tempAvatarUrl != null
+                              ? FileImage(File(tempAvatarUrl!))
+                              : (avatarUrl != null ? NetworkImage(avatarUrl!) : null),
+                          child: avatarUrl == null && tempAvatarUrl == null
+                              ? Icon(Icons.person,
+                                  size: 50, color: AppColors.textPrimary)
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: InkWell(
+                            onTap: _pickImage,
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: AppColors.iconSelected,
+                              child: const Icon(Icons.camera_alt, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 20),
-                  _buildFieldContainer(
-                      "Nombre", nameController, errorMessages["name"]),
+                  _buildFieldContainer("Nombre", nameController, errorMessages["name"]),
                   const SizedBox(height: 20),
-                  _buildFieldContainer(
-                      "Nickname", nicknameController, errorMessages["nickname"]),
+                  _buildFieldContainer("Nickname", nicknameController,
+                      errorMessages["nickname"]),
                   const SizedBox(height: 20),
                   _buildNonEditableFieldContainer("Correo", emailController),
                   const SizedBox(height: 30),

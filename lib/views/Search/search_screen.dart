@@ -42,14 +42,14 @@ class _SearchScreenState extends State<SearchScreen> {
   void _performSearch(String query) async {
     setState(() {
       _isLoading = true;
-      _selectedGenre = null;
+      _selectedGenre = null; // Limpia el género seleccionado al buscar por texto.
     });
 
     try {
       final results = await _supabaseService.searchBooks(query);
       if (mounted) {
         setState(() {
-          _searchResults = results;
+          _searchResults = results.where((book) => book.status == 'enabled').toList(); // Filtra solo libros habilitados
           _isLoading = false;
         });
       }
@@ -66,7 +66,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void _selectGenre(String genre) async {
     setState(() {
       _isLoading = true;
-      _searchController.clear();
+      _searchController.clear(); // Limpia el campo de búsqueda al seleccionar un género.
       _selectedGenre = genre;
     });
 
@@ -74,7 +74,7 @@ class _SearchScreenState extends State<SearchScreen> {
       final results = await _supabaseService.searchBooksByGenre(genre);
       if (mounted) {
         setState(() {
-          _searchResults = results;
+          _searchResults = results.where((book) => book.status == 'enabled').toList(); // Filtra solo libros habilitados
           _isLoading = false;
         });
       }

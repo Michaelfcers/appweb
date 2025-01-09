@@ -92,7 +92,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       final books = await userService.getUploadedBooks();
       if (!mounted) return;
       setState(() {
-        uploadedBooks = books;
+        uploadedBooks = books.where((book) => book.status == 'enabled').toList(); // Solo libros habilitados
       });
     } catch (error) {
       debugPrint('Error al cargar los libros subidos: $error');

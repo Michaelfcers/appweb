@@ -26,79 +26,97 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _setupRealtimeListener();
   }
 
+
   Future<void> _fetchNotifications() async {
-    try {
-      final response = await _supabase
-          .from('notifications')
-          .select()
-          .eq('user_id', _supabase.auth.currentUser!.id)
-          .order('read', ascending: true)
-          .order('created_at', ascending: false);
+  try {
+    final response = await _supabase
+        .from('notifications')
+        .select()
+        .eq('user_id', _supabase.auth.currentUser!.id)
+        .order('read', ascending: true) // No leídas primero
+        .order('created_at', ascending: false); // Más recientes primero dentro de cada grupo
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      setState(() {
-        notifications = List<Map<String, dynamic>>.from(response);
-      });
+    setState(() {
+      notifications = List<Map<String, dynamic>>.from(response);
+    });
 
-      debugPrint('Notificaciones obtenidas: $notifications');
-    } catch (e) {
-      debugPrint('Error al obtener notificaciones: $e');
-    }
+    debugPrint('Notificaciones obtenidas: $notifications');
+  } catch (e) {
+    debugPrint('Error al obtener notificaciones: $e');
   }
+}
+
+
 
   void _setupRealtimeListener() {
-    _realtimeChannel = _supabase.channel('public:notifications');
+  _realtimeChannel = _supabase.channel('public:notifications');
 
-    _realtimeChannel.on(
-      RealtimeListenTypes.postgresChanges,
-      ChannelFilter(
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: 'user_id=eq.${_supabase.auth.currentUser!.id}',
-      ),
-      (payload, [ref]) {
-        final newNotification = payload['new'] as Map<String, dynamic>;
-        if (!mounted) return;
+  _realtimeChannel.on(
+    RealtimeListenTypes.postgresChanges,
+    ChannelFilter(
+      event: 'INSERT',
+      schema: 'public',
+      table: 'notifications',
+      filter: 'user_id=eq.${_supabase.auth.currentUser?.id}',
+    ),
+    (payload, [ref]) {
+      if (payload == null || payload['new'] == null) {
+        debugPrint('Payload vacío o inválido.');
+        return;
+      }
 
-        setState(() {
-          notifications.insert(0, newNotification);
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Nueva notificación: ${newNotification['content']}'),
-          ),
-        );
-      },
-    );
-
-    _realtimeChannel.subscribe();
-  }
-
-  Future<void> _markAsRead(String notificationId) async {
-    try {
-      await _supabase
-          .from('notifications')
-          .update({'read': true})
-          .eq('id', notificationId);
-
+      final newNotification = payload['new'] as Map<String, dynamic>;
       if (!mounted) return;
 
       setState(() {
-        final index =
-            notifications.indexWhere((n) => n['id'] == notificationId);
-        if (index != -1) {
-          notifications[index]['read'] = true;
-        }
+        // Agregar la nueva notificación al inicio
+        notifications.insert(0, newNotification);
       });
 
-      debugPrint('Notificación marcada como leída: $notificationId');
-    } catch (e) {
-      debugPrint('Error al marcar notificación como leída: $e');
-    }
+      // Mostrar mensaje emergente para la nueva notificación
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nueva notificación: ${newNotification['content']}'),
+        ),
+      );
+    },
+  );
+
+  // Suscribirse al canal (no asignar el resultado ya que devuelve void)
+  try {
+    _realtimeChannel.subscribe();
+  } catch (e) {
+    debugPrint('Error al suscribirse al canal de notificaciones: $e');
   }
+}
+
+
+
+
+  Future<void> _markAsRead(String notificationId) async {
+  try {
+    await _supabase
+        .from('notifications')
+        .update({'read': true})
+        .eq('id', notificationId);
+
+    if (!mounted) return;
+
+    setState(() {
+      final index = notifications.indexWhere((n) => n['id'] == notificationId);
+      if (index != -1) {
+        notifications[index]['read'] = true;
+      }
+    });
+
+    debugPrint('Notification marked as read: $notificationId');
+  } catch (e) {
+    debugPrint('Error marking notification as read: $e');
+  }
+}
+
 
   Future<void> _openTradeProposalDialog(Map<String, dynamic> notification) async {
     showDialog(
