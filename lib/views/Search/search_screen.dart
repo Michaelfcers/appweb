@@ -20,10 +20,12 @@ class _SearchScreenState extends State<SearchScreen> {
   List<String> _genres = [];
   String? _selectedGenre;
   bool _isLoading = false;
+  late String _currentUserId; // Variable para almacenar el ID del usuario actual
 
   @override
   void initState() {
     super.initState();
+    _currentUserId = _supabaseService.getCurrentUserId(); // Obtener el ID del usuario actual
     _loadGenres();
   }
 
@@ -50,16 +52,18 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
+      // Buscar libros, autores y usuarios
       final bookResults = await _supabaseService.searchBooks(query);
       final authorResults = await _supabaseService.searchBooksByAuthor(query);
       final userResults = await _supabaseService.searchUsers(query);
 
       if (mounted) {
         setState(() {
+          // Filtrar resultados para excluir los libros del usuario actual y al propio usuario
           _searchResults = [
-            ...bookResults,
-            ...authorResults,
-            ...userResults,
+            ...bookResults.where((book) => book.userId != _currentUserId),
+            ...authorResults.where((book) => book.userId != _currentUserId),
+            ...userResults.where((user) => user['id'] != _currentUserId),
           ];
           _isLoading = false;
         });
@@ -87,7 +91,10 @@ class _SearchScreenState extends State<SearchScreen> {
       final results = await _supabaseService.searchBooksByGenre(genre);
       if (mounted) {
         setState(() {
-          _searchResults = results.where((book) => book.status == 'enabled').toList();
+          // Filtrar resultados para excluir los libros del usuario actual
+          _searchResults = results
+              .where((book) => book.status == 'enabled' && book.userId != _currentUserId)
+              .toList();
           _isLoading = false;
         });
       }
@@ -168,36 +175,34 @@ class _SearchScreenState extends State<SearchScreen> {
 
             // Genre Dropdown
             if (_genres.isNotEmpty)
-  GestureDetector(
-    onTap: () => _showGenreSelector(context),
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.transparent),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            _selectedGenre ?? "Seleccionar género",
-            style: TextStyle(
-              color: _selectedGenre != null
-                  ? AppColors.textPrimary
-                  : AppColors.textSecondary,
-              fontSize: 16,
-            ),
-          ),
-          Icon(Icons.arrow_drop_down, color: AppColors.iconSelected),
-        ],
-      ),
-    ),
-  ),
+              GestureDetector(
+                onTap: () => _showGenreSelector(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBackground,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.transparent),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _selectedGenre ?? "Seleccionar género",
+                        style: TextStyle(
+                          color: _selectedGenre != null
+                              ? AppColors.textPrimary
+                              : AppColors.textSecondary,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Icon(Icons.arrow_drop_down, color: AppColors.iconSelected),
+                    ],
+                  ),
+                ),
+              ),
 
-
-const SizedBox(height: 16),
-
+            const SizedBox(height: 16),
 
             // Search Results
             Expanded(
@@ -239,74 +244,72 @@ const SizedBox(height: 16),
     );
   }
 
-void _showGenreSelector(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (BuildContext context) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Selecciona un Género',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+  void _showGenreSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Selecciona un Género',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _genres.length,
-                itemBuilder: (context, index) {
-                  final genre = _genres[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context); // Cierra el modal
-                        _selectGenre(genre); // Llama a la búsqueda por género
-                      },
-                      child: Material(
-                        elevation: 3,
-                        borderRadius: BorderRadius.circular(10),
-                        color: AppColors.cardBackground,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 16, horizontal: 20),
-                          child: Text(
-                            genre,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textPrimary,
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _genres.length,
+                  itemBuilder: (context, index) {
+                    final genre = _genres[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.pop(context); // Cierra el modal
+                          _selectGenre(genre); // Llama a la búsqueda por género
+                        },
+                        child: Material(
+                          elevation: 3,
+                          borderRadius: BorderRadius.circular(10),
+                          color: AppColors.cardBackground,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 20),
+                            child: Text(
+                              genre,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildBookCard(Book book) {
     return Card(

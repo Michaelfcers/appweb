@@ -5,6 +5,15 @@ import '../models/book_model.dart';
 class SupabaseService {
   final SupabaseClient _client = Supabase.instance.client;
 
+  /// Obtiene el ID del usuario actual
+  String getCurrentUserId() {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw Exception('No hay un usuario autenticado.');
+    }
+    return user.id;
+  }
+
   // Obtener géneros únicos desde Supabase
   Future<List<String>> fetchGenres() async {
     try {
@@ -12,14 +21,13 @@ class SupabaseService {
           .from('books')
           .select('genre')
           .neq('genre', null)
+          .neq('status', 'disabled') // Excluir libros con status "disabled"
           .execute();
 
-      // Verificar si hubo un error en la respuesta
       if (response.status != 200) {
         throw Exception('Error al obtener géneros: ${response.status}');
       }
 
-      // Procesar los datos
       final genres = (response.data as List)
           .map((item) => item['genre'] as String)
           .toSet()
@@ -30,121 +38,123 @@ class SupabaseService {
     }
   }
 
-  // Método para obtener géneros desde la base de datos utilizando RPC
+  // Obtener géneros desde la base de datos utilizando RPC
   Future<List<String>> fetchGenresFromDatabase() async {
     try {
       final response = await _client.rpc('get_book_genres').execute();
 
-      // Verificar si hubo un error en la respuesta
       if (response.status != 200 || response.data == null) {
         throw Exception('Error al obtener géneros: ${response.status}');
       }
 
-      // Procesar la respuesta para extraer únicamente los valores de 'genre'
       final genres = (response.data as List)
           .map((e) => e['genre'].toString())
           .toList();
 
       return genres;
     } catch (e) {
-      print('Error al cargar géneros: $e');
-      throw Exception('Error al cargar géneros.');
+      throw Exception('Error al cargar géneros: $e');
     }
   }
 
-  /// Buscar libros por título
-Future<List<Book>> searchBooks(String query) async {
-  try {
-    final response = await _client
-        .from('books')
-        .select('*')
-        .ilike('title', '%$query%')
-        .execute();
+  // Buscar libros por título excluyendo los propios y con estado "enabled"
+  Future<List<Book>> searchBooks(String query) async {
+    try {
+      final userId = getCurrentUserId();
+      final response = await _client
+          .from('books')
+          .select('*')
+          .ilike('title', '%$query%')
+          .neq('user_id', userId) // Excluir libros del usuario actual
+          .eq('status', 'enabled') // Incluir solo libros con status "enabled"
+          .execute();
 
-    // Verificar si hay datos y procesar el resultado
-    if (response.data != null) {
-      return (response.data as List)
-          .map((item) => Book.fromSupabaseJson(item))
-          .toList();
-    } else {
-      throw Exception('Error al buscar libros: Datos no encontrados.');
+      if (response.data != null) {
+        return (response.data as List)
+            .map((item) => Book.fromSupabaseJson(item))
+            .toList();
+      } else {
+        throw Exception('Error al buscar libros: Datos no encontrados.');
+      }
+    } catch (e) {
+      throw Exception('Error al buscar libros: $e');
     }
-  } catch (e) {
-    throw Exception('Error al buscar libros: $e');
   }
-}
 
-// Buscar libros por género
-Future<List<Book>> searchBooksByGenre(String genre) async {
-  try {
-    final response = await _client
-        .from('books')
-        .select('*')
-        .eq('genre', genre)
-        .execute();
+  // Buscar libros por género excluyendo los propios y con estado "enabled"
+  Future<List<Book>> searchBooksByGenre(String genre) async {
+    try {
+      final userId = getCurrentUserId();
+      final response = await _client
+          .from('books')
+          .select('*')
+          .eq('genre', genre)
+          .neq('user_id', userId) // Excluir libros del usuario actual
+          .eq('status', 'enabled') // Incluir solo libros con status "enabled"
+          .execute();
 
-    // Verificar si hay datos y procesar el resultado
-    if (response.data != null) {
-      return (response.data as List)
-          .map((item) => Book.fromSupabaseJson(item))
-          .toList();
-    } else {
-      throw Exception('Error al buscar libros por género: Datos no encontrados.');
+      if (response.data != null) {
+        return (response.data as List)
+            .map((item) => Book.fromSupabaseJson(item))
+            .toList();
+      } else {
+        throw Exception('Error al buscar libros por género: Datos no encontrados.');
+      }
+    } catch (e) {
+      throw Exception('Error al buscar libros por género: $e');
     }
-  } catch (e) {
-    throw Exception('Error al buscar libros por género: $e');
   }
-}
 
-// Buscar libros por autor
-Future<List<Book>> searchBooksByAuthor(String author) async {
-  try {
-    final response = await _client
-        .from('books')
-        .select('*')
-        .ilike('author', '%$author%') // Busca autores que coincidan parcialmente
-        .execute();
+  // Buscar libros por autor excluyendo los propios y con estado "enabled"
+  Future<List<Book>> searchBooksByAuthor(String author) async {
+    try {
+      final userId = getCurrentUserId();
+      final response = await _client
+          .from('books')
+          .select('*')
+          .ilike('author', '%$author%')
+          .neq('user_id', userId) // Excluir libros del usuario actual
+          .eq('status', 'enabled') // Incluir solo libros con status "enabled"
+          .execute();
 
-    // Verificar si hubo un error en el estado de la respuesta
-    if (response.status != 200 || response.data == null) {
-      throw Exception('Error al buscar libros por autor. Código de estado: ${response.status}');
+      if (response.data != null) {
+        return (response.data as List)
+            .map((item) => Book.fromSupabaseJson(item))
+            .toList();
+      } else {
+        throw Exception('Error al buscar libros por autor: Datos no encontrados.');
+      }
+    } catch (e) {
+      throw Exception('Error al buscar libros por autor: $e');
     }
-
-    // Procesar los resultados
-    return (response.data as List)
-        .map((item) => Book.fromSupabaseJson(item))
-        .toList();
-  } catch (e) {
-    throw Exception('Error al buscar libros por autor: $e');
   }
-}
 
-// Buscar usuarios por nombre o nickname
-Future<List<Map<String, String>>> searchUsers(String query) async {
-  try {
-    final response = await _client
-        .from('users')
-        .select('id, name, nickname')
-        .or('name.ilike.%$query%,nickname.ilike.%$query%')
-        .execute();
+  // Buscar usuarios por nombre o nickname excluyendo al usuario actual
+  Future<List<Map<String, String>>> searchUsers(String query) async {
+    try {
+      final userId = getCurrentUserId();
+      final response = await _client
+          .from('users')
+          .select('id, name, nickname')
+          .or('name.ilike.%$query%,nickname.ilike.%$query%')
+          .neq('id', userId) // Excluir al usuario actual
+          .execute();
 
-    // Verificar si hay datos y procesar el resultado
-    if (response.data != null) {
-      return (response.data as List).map((item) {
-        return {
-          'id': item['id'] as String,
-          'name': item['name'] as String? ?? 'Sin nombre',
-          'nickname': item['nickname'] as String? ?? 'Sin nickname',
-        };
-      }).toList();
-    } else {
-      return [];
+      if (response.data != null) {
+        return (response.data as List).map((item) {
+          return {
+            'id': item['id'] as String,
+            'name': item['name'] as String? ?? 'Sin nombre',
+            'nickname': item['nickname'] as String? ?? 'Sin nickname',
+          };
+        }).toList();
+      } else {
+        return [];
+      }
+    } catch (e) {
+      throw Exception('Error al buscar usuarios: $e');
     }
-  } catch (e) {
-    throw Exception('Error al buscar usuarios: $e');
   }
-}
-
 
   // Subir fotos a Supabase
   Future<List<String>> uploadPhotos(List<File> photos) async {
@@ -178,7 +188,9 @@ Future<List<Map<String, String>>> searchUsers(String query) async {
         'description': book.description,
         'condition': book.condition,
         'thumbnail': book.thumbnail,
-        'photos': book.photos != null ? book.photos : [],
+        'photos': book.photos ?? [],
+        'user_id': getCurrentUserId(), // Asociar el libro al usuario actual
+        'status': book.status ?? 'enabled', // Asignar status por defecto
       }).execute();
 
       if (response.status != 200) {

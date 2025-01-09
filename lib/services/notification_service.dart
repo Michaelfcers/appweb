@@ -141,4 +141,7 @@ void subscribeToNotifications(void Function() onNotificationReceived) {
     _messagesChannel?.unsubscribe();
     _notificationsChannel?.unsubscribe();
   }
+
+  
+
 }
