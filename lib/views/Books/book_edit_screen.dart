@@ -27,29 +27,41 @@ class _BookEditScreenState extends State<BookEditScreen> {
   List<String> _existingPhotos = [];
   List<File> _newPhotos = [];
   List<String> _deletedPhotos = [];
+  List<String> _genres = [];
   bool _isLoading = false;
 
   @override
-void initState() {
-  super.initState();
-  _titleController = TextEditingController(text: widget.book.title);
-  _synopsisController = TextEditingController(text: widget.book.description ?? '');
-  _conditionController = TextEditingController(text: widget.book.condition ?? '');
-  _authorController = TextEditingController(text: widget.book.author);
-  _genreController = TextEditingController(text: widget.book.genre ?? '');
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.book.title);
+    _synopsisController = TextEditingController(text: widget.book.description ?? '');
+    _conditionController = TextEditingController(text: widget.book.condition ?? '');
+    _authorController = TextEditingController(text: widget.book.author);
+    _genreController = TextEditingController(text: widget.book.genre ?? '');
 
-  // Sanitizar URLs de imágenes existentes
-  _existingPhotos = widget.book.photos?.map(_sanitizeImageUrl).toList() ?? [];
-}
+    // Sanitizar URLs de imágenes existentes
+    _existingPhotos = widget.book.photos?.map(_sanitizeImageUrl).toList() ?? [];
 
-String _sanitizeImageUrl(String url) {
-  if (url.contains('/books/books/')) {
-    return url.replaceAll('/books/books/', '/books/');
+    // Cargar géneros desde la base de datos
+    _fetchGenres();
   }
-  return url;
-}
 
+  Future<void> _fetchGenres() async {
+    try {
+      _genres = await _userService.fetchGenresFromDatabase();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cargar los géneros: $e')),
+      );
+    }
+  }
 
+  String _sanitizeImageUrl(String url) {
+    if (url.contains('/books/books/')) {
+      return url.replaceAll('/books/books/', '/books/');
+    }
+    return url;
+  }
 
   @override
   void dispose() {
@@ -84,56 +96,59 @@ String _sanitizeImageUrl(String url) {
   }
 
   Future<void> _saveChanges() async {
-    setState(() {
-      _isLoading = true;
-    });
+  setState(() {
+    _isLoading = true;
+  });
 
-    try {
-      // Subir las nuevas imágenes
-      List<String> uploadedPhotos = [];
-      for (File photo in _newPhotos) {
-        final String imageUrl = await _userService.uploadImageToStorage(
-          photo.path,
-          'image_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        );
-        uploadedPhotos.add(imageUrl);
-      }
-
-      // Actualizar el libro
-      await _userService.updateBook(
-        bookId: widget.book.id,
-        title: _titleController.text.trim(),
-        description: _synopsisController.text.trim(),
-        condition: _conditionController.text.trim(),
-        photos: [..._existingPhotos, ...uploadedPhotos],
-        deletedPhotos: _deletedPhotos,
+  try {
+    // Subir las nuevas imágenes
+    List<String> uploadedPhotos = [];
+    for (File photo in _newPhotos) {
+      final String imageUrl = await _userService.uploadImageToStorage(
+        photo.path,
+        'image_${DateTime.now().millisecondsSinceEpoch}.jpg',
       );
-
-      final updatedBook = Book(
-        id: widget.book.id,
-        title: _titleController.text.trim(),
-        author: _authorController.text.trim(),
-        thumbnail: widget.book.thumbnail,
-        genre: _genreController.text.trim(),
-        description: _synopsisController.text.trim(),
-        condition: _conditionController.text.trim(),
-        userId: widget.book.userId,
-        photos: [..._existingPhotos, ...uploadedPhotos],
-      );
-
-      if (!mounted) return;
-
-      await _showSaveSuccessDialog();
-      Navigator.pop(context, updatedBook);
-    } catch (e) {
-      if (!mounted) return;
-      await _showSaveErrorDialog();
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      uploadedPhotos.add(imageUrl);
     }
+
+    // Actualizar el libro, incluyendo autor y género
+    await _userService.updateBook(
+      bookId: widget.book.id,
+      title: _titleController.text.trim(),
+      description: _synopsisController.text.trim(),
+      condition: _conditionController.text.trim(),
+      author: _authorController.text.trim(), // Autor añadido
+      genre: _genreController.text.trim(),   // Género añadido
+      photos: [..._existingPhotos, ...uploadedPhotos],
+      deletedPhotos: _deletedPhotos,
+    );
+
+    final updatedBook = Book(
+      id: widget.book.id,
+      title: _titleController.text.trim(),
+      author: _authorController.text.trim(),
+      thumbnail: widget.book.thumbnail,
+      genre: _genreController.text.trim(),
+      description: _synopsisController.text.trim(),
+      condition: _conditionController.text.trim(),
+      userId: widget.book.userId,
+      photos: [..._existingPhotos, ...uploadedPhotos],
+    );
+
+    if (!mounted) return;
+
+    await _showSaveSuccessDialog();
+    Navigator.pop(context, updatedBook);
+  } catch (e) {
+    if (!mounted) return;
+    await _showSaveErrorDialog();
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -164,37 +179,37 @@ String _sanitizeImageUrl(String url) {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: _existingPhotos.isNotEmpty
-      ? ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            _existingPhotos.first, // Usa la primera imagen como principal
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Center(
-                child: Icon(
-                  Icons.broken_image,
-                  size: 50,
-                  color: AppColors.textPrimary.withOpacity(0.7),
-                ),
-              );
-            },
-          ),
-        )
-      : Center(
-          child: Icon(
-            Icons.book,
-            size: 50,
-            color: AppColors.textPrimary.withOpacity(0.7),
-          ),
-        ),
-        ),
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        _existingPhotos.first, // Usa la primera imagen como principal
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Center(
+                            child: Icon(
+                              Icons.broken_image,
+                              size: 50,
+                              color: AppColors.textPrimary.withOpacity(0.7),
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  : Center(
+                      child: Icon(
+                        Icons.book,
+                        size: 50,
+                        color: AppColors.textPrimary.withOpacity(0.7),
+                      ),
+                    ),
+            ),
 
             // Campos de texto
             _buildTextField(_titleController, 'Título', isEditable: true),
             const SizedBox(height: 10),
             _buildTextField(_authorController, 'Autor', isEditable: true),
             const SizedBox(height: 10),
-            _buildTextField(_genreController, 'Género', isEditable: true),
+            _buildGenreField(_genreController), // Campo de Género
             const SizedBox(height: 10),
             _buildTextField(
               _synopsisController,
@@ -332,31 +347,93 @@ String _sanitizeImageUrl(String url) {
     );
   }
 
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label, {
-    required bool isEditable,
-    int maxLines = 1,
-  }) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      enabled: isEditable,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: AppColors.iconSelected),
-        filled: true,
-        fillColor: AppColors.cardBackground,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.iconSelected),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.iconSelected),
+  Widget _buildGenreField(TextEditingController controller) {
+    return GestureDetector(
+      onTap: () => _showGenreSelector(controller),
+      child: AbsorbPointer(
+        child: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            labelText: 'Seleccionar Género',
+            labelStyle: TextStyle(color: AppColors.iconSelected),
+            filled: true,
+            fillColor: AppColors.cardBackground,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.iconSelected),
+            ),
+            suffixIcon: Icon(
+              Icons.arrow_drop_down,
+              color: AppColors.iconSelected,
+            ),
+          ),
         ),
       ),
-      style: const TextStyle(color: Colors.black),
+    );
+  }
+
+  void _showGenreSelector(TextEditingController controller) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Selecciona un Género',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _genres.length,
+                  itemBuilder: (context, index) {
+                    final genre = _genres[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            controller.text = genre;
+                          });
+                          Navigator.pop(context); // Cierra el modal
+                        },
+                        child: Material(
+                          elevation: 3,
+                          borderRadius: BorderRadius.circular(10),
+                          color: AppColors.cardBackground,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 20),
+                            child: Text(
+                              genre,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -416,7 +493,33 @@ String _sanitizeImageUrl(String url) {
       ),
     );
   }
-
+Widget _buildTextField(
+    TextEditingController controller,
+    String label, {
+    required bool isEditable,
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      enabled: isEditable,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: AppColors.iconSelected),
+        filled: true,
+        fillColor: AppColors.cardBackground,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.iconSelected),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.iconSelected),
+        ),
+      ),
+      style: const TextStyle(color: Colors.black),
+    );
+  }
   Future<void> _showSaveErrorDialog() async {
     await showDialog(
       context: context,

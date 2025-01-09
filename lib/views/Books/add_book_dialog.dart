@@ -24,6 +24,25 @@ class _AddBookDialogState extends State<AddBookDialog> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _conditionController = TextEditingController();
 
+List<String> _genres = []; // Lista para almacenar los géneros disponibles
+
+@override
+void initState() {
+  super.initState();
+  _loadGenres(); // Llama a la función para cargar los géneros
+}
+
+Future<void> _loadGenres() async {
+  try {
+    final genres = await _userService.fetchGenresFromDatabase();
+    setState(() {
+      _genres = genres; // Actualiza la lista con los géneros obtenidos
+    });
+  } catch (e) {
+    _showErrorDialog("Error al cargar géneros: ${e.toString()}");
+  }
+}
+
   String? _thumbnailUrl;
   bool _isLoading = false;
   bool _titleError = false;
@@ -261,38 +280,35 @@ class _AddBookDialogState extends State<AddBookDialog> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _buildThumbnail(),
-                  const SizedBox(height: 24),
-                  _buildTitleAutocomplete(),
-                  if (_titleError)
-                    Text('El título es obligatorio',
-                        style: TextStyle(color: Colors.red)),
-                  const SizedBox(height: 10),
-                  _buildReadOnlyField(_authorController, 'Autor'),
-                  const SizedBox(height: 10),
-                  _buildReadOnlyField(_genreController, 'Género'),
-                  const SizedBox(height: 10),
-                  _buildTextField(_descriptionController, 'Descripción / Sinopsis'),
-                  const SizedBox(height: 10),
-                  _buildTextField(_conditionController, 'Condición'),
-                  if (_conditionError)
-                    Text('Este campo es obligatorio',
-                        style: TextStyle(color: Colors.red)),
-                  const SizedBox(height: 10),
-                  _buildPhotoPicker(),
-                  if (_imageError)
-                    Text('Sube al menos una imagen',
-                        style: TextStyle(color: Colors.red)),
-                  const SizedBox(height: 24),
-                  _buildSubmitButton(),
-                  const SizedBox(height: 24),
-                  Divider(color: AppColors.iconSelected.withOpacity(0.5)),
-                  const SizedBox(height: 16),
-                  _buildManualAddOption(),
-                ],
-              ),
+  crossAxisAlignment: CrossAxisAlignment.center,
+  children: [
+    _buildThumbnail(),
+    const SizedBox(height: 24),
+    _buildTitleAutocomplete(),
+    if (_titleError)
+      Text('El título es obligatorio', style: TextStyle(color: Colors.red)),
+    const SizedBox(height: 10),
+    _buildReadOnlyField(_authorController, 'Autor'),
+    const SizedBox(height: 10),
+    _buildGenreDropdown(_genreController), // Campo de género como Dropdown
+    const SizedBox(height: 10),
+    _buildTextField(_descriptionController, 'Descripción / Sinopsis'),
+    const SizedBox(height: 10),
+    _buildTextField(_conditionController, 'Condición'),
+    if (_conditionError)
+      Text('Este campo es obligatorio', style: TextStyle(color: Colors.red)),
+    const SizedBox(height: 10),
+    _buildPhotoPicker(),
+    if (_imageError)
+      Text('Sube al menos una imagen', style: TextStyle(color: Colors.red)),
+    const SizedBox(height: 24),
+    _buildSubmitButton(),
+    const SizedBox(height: 24),
+    Divider(color: AppColors.iconSelected.withOpacity(0.5)),
+    const SizedBox(height: 16),
+    _buildManualAddOption(),
+  ],
+),
             ),
           ),
           if (_isLoading)
@@ -308,6 +324,99 @@ class _AddBookDialogState extends State<AddBookDialog> {
       ),
     );
   }
+
+  Widget _buildGenreDropdown(TextEditingController controller) {
+  return GestureDetector(
+    onTap: () => _showGenreSelector(controller),
+    child: AbsorbPointer(
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: 'Seleccionar Género',
+          labelStyle: TextStyle(color: AppColors.iconSelected),
+          filled: true,
+          fillColor: AppColors.cardBackground,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: AppColors.iconSelected),
+          ),
+          suffixIcon: Icon(
+            Icons.arrow_drop_down, // Flecha única
+            color: AppColors.iconSelected,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+void _showGenreSelector(TextEditingController controller) {
+  showModalBottomSheet(
+    context: context,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (BuildContext context) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Selecciona un Género',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _genres.length,
+                itemBuilder: (context, index) {
+                  final genre = _genres[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          controller.text = genre;
+                        });
+                        Navigator.pop(context); // Cierra el modal
+                      },
+                      child: Material(
+                        elevation: 3,
+                        borderRadius: BorderRadius.circular(10),
+                        color: AppColors.cardBackground,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 20),
+                          child: Text(
+                            genre,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+
+
 
   Widget _buildThumbnail() {
     return Container(

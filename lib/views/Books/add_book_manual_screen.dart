@@ -21,6 +21,25 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
   final TextEditingController _conditionController = TextEditingController();
 
   final List<File> _uploadedPhotos = [];
+  final List<String> _genres = [
+    'Ficción',
+    'No ficción',
+    'Ciencia ficción',
+    'Fantasía',
+    'Misterio',
+    'Romance',
+    'Terror',
+    'Aventura',
+    'Histórico',
+    'Biografía y autobiografía',
+    'Poesía',
+    'Drama',
+    'Ensayo',
+    'Autoayuda',
+    'Infantil',
+    'Juvenil',
+    'Humor',
+  ];
   bool _isLoading = false;
 
   // Control de errores para cada campo
@@ -144,10 +163,9 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
                 const SizedBox(height: 10),
                 _buildTextField(_authorController, 'Autor', _authorError),
                 const SizedBox(height: 10),
-                _buildTextField(_genreController, 'Género', _genreError),
+                _buildGenreField(_genreController),
                 const SizedBox(height: 10),
-                _buildTextField(
-                    _descriptionController, 'Descripción / Sinopsis', _descriptionError),
+                _buildTextField(_descriptionController, 'Descripción / Sinopsis', _descriptionError),
                 const SizedBox(height: 10),
                 _buildTextField(_conditionController, 'Condición', _conditionError),
                 const SizedBox(height: 10),
@@ -193,6 +211,44 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
       ),
     );
   }
+
+Widget _buildTextField(TextEditingController controller, String label, bool hasError) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      TextField(
+        controller: controller,
+        onChanged: (value) {
+          setState(() {
+            if (label == 'Título') _titleError = false;
+            if (label == 'Autor') _authorError = false;
+            if (label == 'Descripción / Sinopsis') _descriptionError = false;
+            if (label == 'Condición') _conditionError = false;
+          });
+        },
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: AppColors.iconSelected),
+          filled: true,
+          fillColor: AppColors.cardBackground,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: AppColors.iconSelected),
+          ),
+        ),
+        style: const TextStyle(color: Colors.black),
+      ),
+      if (hasError)
+        Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Text(
+            'Este campo es obligatorio',
+            style: TextStyle(color: Colors.red),
+          ),
+        ),
+    ],
+  );
+}
 
   Widget _buildThumbnail() {
     return Container(
@@ -283,24 +339,14 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
     );
   }
 
-  Widget _buildTextField(
-      TextEditingController controller, String label, bool hasError) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
+  Widget _buildGenreField(TextEditingController controller) {
+    return GestureDetector(
+      onTap: () => _showGenreSelector(controller),
+      child: AbsorbPointer(
+        child: TextField(
           controller: controller,
-          onChanged: (value) {
-            setState(() {
-              if (label == 'Título') _titleError = false;
-              if (label == 'Autor') _authorError = false;
-              if (label == 'Género') _genreError = false;
-              if (label == 'Descripción / Sinopsis') _descriptionError = false;
-              if (label == 'Condición') _conditionError = false;
-            });
-          },
           decoration: InputDecoration(
-            labelText: label,
+            labelText: 'Seleccionar Género',
             labelStyle: TextStyle(color: AppColors.iconSelected),
             filled: true,
             fillColor: AppColors.cardBackground,
@@ -308,66 +354,124 @@ class _AddBookManualScreenState extends State<AddBookManualScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.iconSelected),
             ),
-          ),
-          style: const TextStyle(color: Colors.black),
-        ),
-        if (hasError)
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0),
-            child: Text(
-              'Este campo es obligatorio',
-              style: TextStyle(color: Colors.red),
+            suffixIcon: Icon(
+              Icons.arrow_drop_down,
+              color: AppColors.iconSelected,
             ),
           ),
-      ],
+        ),
+      ),
+    );
+  }
+
+  void _showGenreSelector(TextEditingController controller) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Selecciona un Género',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _genres.length,
+                  itemBuilder: (context, index) {
+                    final genre = _genres[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            controller.text = genre;
+                          });
+                          Navigator.pop(context); // Cierra el modal
+                        },
+                        child: Material(
+                          elevation: 3,
+                          borderRadius: BorderRadius.circular(10),
+                          color: AppColors.cardBackground,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 20),
+                            child: Text(
+                              genre,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
   void _showSuccessDialog() {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 60),
-            const SizedBox(height: 10),
-            const Text(
-              'Éxito',
-              style: TextStyle(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 60),
+              const SizedBox(height: 10),
+              const Text(
+                'Éxito',
+                style: TextStyle(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          content: const Text(
+            'El libro se guardó con éxito.',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            Center(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.iconSelected,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(context); // Cierra el diálogo
+                  Navigator.pop(context, true); // Devuelve `true` a AddBookDialog
+                },
+                child: const Text('Aceptar'),
+              ),
             ),
           ],
-        ),
-        content: const Text(
-          'El libro se guardó con éxito.',
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          Center(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.iconSelected,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              onPressed: () {
-                Navigator.pop(context); // Cierra el diálogo
-                Navigator.pop(context, true); // Devuelve `true` a AddBookDialog
-              },
-              child: const Text('Aceptar'),
-            ),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-
+        );
+      },
+    );
+  }
 }

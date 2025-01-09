@@ -86,10 +86,33 @@ class UserService {
   }
 }
 
+// Obtener géneros dinámicamente desde la base de datos
+Future<List<String>> fetchGenresFromDatabase() async {
+  try {
+    final response = await _supabase.rpc('get_book_genres').execute();
+
+    // Verificar si hubo un error en la respuesta
+    if (response.status != 200 || response.data == null) {
+      throw Exception('Error al obtener géneros: ${response.status}');
+    }
+
+    // Procesar la respuesta para extraer únicamente los valores de 'genre'
+    final genres = (response.data as List)
+        .map((e) => e['genre'].toString()) // Accede al campo 'genre'
+        .toList();
+
+    return genres;
+  } catch (e) {
+    print('Error al cargar géneros: $e');
+    throw Exception('Error al cargar géneros.');
+  }
+}
 
 
 
-  // Obtener libros subidos por el usuario autenticado
+
+
+// Obtener libros subidos por el usuario autenticado
 Future<List<Book>> getUploadedBooks({String? status}) async {
   final userId = getCurrentUserId();
 
@@ -136,6 +159,8 @@ Future<void> updateBook({
   required String condition,
   List<String>? photos, // Lista de fotos actualizadas
   List<String>? deletedPhotos, // Lista de fotos eliminadas
+    required String author, // Add this
+  required String genre,  // Add this
 }) async {
   try {
     // Construye el mapa de actualizaciones
@@ -144,6 +169,8 @@ Future<void> updateBook({
       'synopsis': description,
       'condition': condition,
       'updated_at': DateTime.now().toIso8601String(),
+       'author': author, // Include author in the update
+      'genre': genre,   // Include genre in the update
     };
 
     // Si hay fotos, conviértelas a JSON y agrégalas al mapa de actualizaciones
